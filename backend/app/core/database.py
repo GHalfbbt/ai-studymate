@@ -13,6 +13,7 @@ from app.core.config import settings
 
 # Create SQLAlchemy engine connected to Supabase PostgreSQL
 # pool_pre_ping ensures connections are valid before using them
+# prepare_threshold=0 disables prepared statements (required for PgBouncer/Supabase pooler)
 engine = create_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,
