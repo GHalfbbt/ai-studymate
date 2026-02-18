@@ -1,0 +1,8 @@
+/* ===================================================================
+   App-level styles (minimal - most styling via Tailwind + index.css)
+   =================================================================== */
+
+/* Layout transitions for sidebar toggle */
+.layout-transition {
+  transition: margin-left 0.3s ease, width 0.3s ease;
+}
