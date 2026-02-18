@@ -1,6 +1,26 @@
 version: '3.9'
 
 services:
+  # ─────────────────────────────────────────────
+  # Database migration service
+  # Runs Alembic migrations before backend starts
+  # ─────────────────────────────────────────────
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: studymate-migrate
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+    command: alembic upgrade head
+    networks:
+      - studymate-network
+
+  # ─────────────────────────────────────────────
+  # FastAPI Backend
+  # ─────────────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -8,39 +28,21 @@ services:
     container_name: studymate-backend
     ports:
       - "8000:8000"
-    environment:
-      # Database
-      - DATABASE_URL=${DATABASE_URL}
-      # LLM
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - LLM_PROVIDER=${LLM_PROVIDER:-groq}
-      # OpenAI (optional)
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      # Voice
-      - SPEECHMATICS_API_KEY=${SPEECHMATICS_API_KEY}
-      - STT_PROVIDER=${STT_PROVIDER:-speechmatics}
-      # Security
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-      - JWT_ALGORITHM=HS256
-      - ACCESS_TOKEN_EXPIRE_MINUTES=1440
-      # Vector DB
-      - VECTOR_DB_PATH=/app/data/chromadb
-      # Storage
-      - UPLOAD_DIR=/app/uploads
-      - MAX_UPLOAD_SIZE=10485760
-      # CORS
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
-      # Application
-      - ENVIRONMENT=development
-      - LOG_LEVEL=INFO
+    env_file:
+      - ./backend/.env
     volumes:
       - ./backend:/app
       - backend-data:/app/data
       - backend-uploads:/app/uploads
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - migrate
     networks:
       - studymate-network
 
+  # ─────────────────────────────────────────────
+  # React Frontend
+  # ─────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
@@ -63,6 +65,7 @@ services:
 volumes:
   backend-data:
   backend-uploads:
+
 
 networks:
   studymate-network:
