@@ -11,5 +11,10 @@ export default defineConfig({
   server: {
     port: 3000,
     host: '0.0.0.0',
+    watch: {
+      // Enable polling for Docker on Windows (inotify doesn't work across volume mounts)
+      usePolling: true,
+      interval: 1000,
+    },
   },
 })
