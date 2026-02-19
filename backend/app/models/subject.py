@@ -7,7 +7,7 @@ and from which exams and flashcards are generated.
 
 from uuid import uuid4
 
-from sqlalchemy import Column, String, DateTime, ForeignKey
+from sqlalchemy import Column, String, DateTime, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -44,15 +44,21 @@ class Subject(Base):
     )
     name = Column(String(255), nullable=False)
     color = Column(String(7), default="#3B82F6")  # Hex color for UI
+    position = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
     course = relationship("Course", back_populates="subjects")
+    topics = relationship(
+        "Topic",
+        back_populates="subject",
+        cascade="all, delete-orphan",
+        order_by="Topic.position",
+    )
     documents = relationship(
         "Document",
         back_populates="subject",
-        cascade="all, delete-orphan",
-        lazy="selectin",
+        foreign_keys="Document.subject_id",
     )
 
     def __repr__(self) -> str:

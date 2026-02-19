@@ -32,7 +32,7 @@ class LLMClient:
             api_key=api_key,
             base_url="https://api.groq.com/openai/v1",
         )
-        self.default_model = "llama-3.1-8b-instant"
+        self.default_model = settings.GROQ_MODEL_NAME
         print(f"✅ LLM Client inicializado (Groq - {self.default_model})")
 
     def generate(

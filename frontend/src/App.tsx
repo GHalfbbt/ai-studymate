@@ -9,6 +9,8 @@ import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout/Layout';
 import Dashboard from './pages/Dashboard';
+import Chat from './pages/Chat';
+import Workspaces from './pages/Workspaces';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import { useAuthStore } from './store/authStore';
@@ -84,7 +86,8 @@ export default function App() {
       {/* Authenticated routes (inside Layout with sidebar) */}
       <Route element={<RequireAuth><Layout /></RequireAuth>}>
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/study" element={<ComingSoon title="Study Chat (RAG)" />} />
+        <Route path="/workspaces" element={<Workspaces />} />
+        <Route path="/chat" element={<Chat />} />
         <Route path="/exams" element={<ComingSoon title="Exam Generation" />} />
         <Route path="/flashcards" element={<ComingSoon title="Flashcards" />} />
         <Route path="/voice" element={<ComingSoon title="Voice Practice" />} />

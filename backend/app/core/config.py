@@ -40,12 +40,16 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
 
     # --- LLM Provider ---
-    LLM_PROVIDER: str = "groq"  # groq, openai, ollama
+    LLM_PROVIDER: str = "groq"  # groq, openai, gemini
     GROQ_API_KEY: Optional[str] = None
+    GROQ_MODEL_NAME: str = "llama-3.1-8b-instant"
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-1.5-flash-lite"
     OPENAI_API_KEY: Optional[str] = None
 
     # --- Vector Database ---
     VECTOR_DB_PATH: str = "./data/chromadb"
+    HF_API_TOKEN: Optional[str] = None
 
     # --- File Storage ---
     UPLOAD_DIR: str = "./uploads"
