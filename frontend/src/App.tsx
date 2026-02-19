@@ -2,17 +2,21 @@
  * Main application component with routing configuration.
  *
  * Sets up routes for all pages within the Layout wrapper.
- * Unauthenticated routes (login/register) are outside the layout.
+ * Authenticated routes require login, public routes don't.
  */
 
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout/Layout';
 import Dashboard from './pages/Dashboard';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import { useAuthStore } from './store/authStore';
+import { getMe } from './api/auth';
 import './App.css';
 
 /**
- * Placeholder page component for features not yet implemented.
- * Used for Day 2-5 pages to show they exist in navigation.
+ * Placeholder page for features not yet implemented.
  */
 function ComingSoon({ title }: { title: string }) {
   return (
@@ -28,11 +32,57 @@ function ComingSoon({ title }: { title: string }) {
   );
 }
 
+/**
+ * Auth guard: redirects to /login if not authenticated.
+ */
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuthStore();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center animate-fade-in">
+          <span className="text-5xl block mb-4">⏳</span>
+          <p style={{ color: 'rgba(226,232,240,0.5)' }}>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 export default function App() {
+  const { token, setAuth, setLoading, logout } = useAuthStore();
+
+  // On mount: try to restore session from stored token
+  useEffect(() => {
+    const restoreSession = async () => {
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const user = await getMe();
+        setAuth(user, token);
+      } catch {
+        // Token invalid or expired
+        logout();
+      }
+    };
+
+    restoreSession();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <Routes>
       {/* Authenticated routes (inside Layout with sidebar) */}
-      <Route element={<Layout />}>
+      <Route element={<RequireAuth><Layout /></RequireAuth>}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/study" element={<ComingSoon title="Study Chat (RAG)" />} />
         <Route path="/exams" element={<ComingSoon title="Exam Generation" />} />
@@ -42,9 +92,9 @@ export default function App() {
         <Route path="/settings" element={<ComingSoon title="Settings" />} />
       </Route>
 
-      {/* Public routes (will be implemented in Day 2) */}
-      <Route path="/login" element={<ComingSoon title="Login" />} />
-      <Route path="/register" element={<ComingSoon title="Register" />} />
+      {/* Public routes (no auth required) */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
 
       {/* Default redirect */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

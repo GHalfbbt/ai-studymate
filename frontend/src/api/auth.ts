@@ -14,7 +14,7 @@ import type { User, AuthToken, LoginCredentials, RegisterData } from '../types';
  * @returns Created user profile
  */
 export async function register(data: RegisterData): Promise<User> {
-    const response = await apiClient.post<User>('/auth/signup', data);
+    const response = await apiClient.post<User>('/auth/register', data);
     return response.data;
 }
 
