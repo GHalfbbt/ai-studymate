@@ -16,8 +16,24 @@ export default function Login() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [demoLoading, setDemoLoading] = useState(false);
     const { setAuth } = useAuthStore();
     const navigate = useNavigate();
+
+    const performLogin = async (loginEmail: string, loginPassword: string) => {
+        // 1. Login to get token
+        const tokenData = await apiLogin({ email: loginEmail, password: loginPassword });
+
+        // 2. Get user profile with the token
+        localStorage.setItem('access_token', tokenData.access_token);
+        const user = await getMe();
+
+        // 3. Set auth state
+        setAuth(user, tokenData.access_token);
+
+        // 4. Redirect to dashboard
+        navigate('/dashboard', { replace: true });
+    };
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -25,24 +41,26 @@ export default function Login() {
         setLoading(true);
 
         try {
-            // 1. Login to get token
-            const tokenData = await apiLogin({ email, password });
-
-            // 2. Get user profile with the token
-            localStorage.setItem('access_token', tokenData.access_token);
-            const user = await getMe();
-
-            // 3. Set auth state
-            setAuth(user, tokenData.access_token);
-
-            // 4. Redirect to dashboard
-            navigate('/dashboard', { replace: true });
+            await performLogin(email, password);
         } catch (err: any) {
             const message = err?.response?.data?.detail || 'Invalid email or password';
             setError(message);
             localStorage.removeItem('access_token');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleTryDemo = async () => {
+        setError('');
+        setDemoLoading(true);
+
+        try {
+            await performLogin('demo@studymate.ai', 'demo1234');
+        } catch (err: any) {
+            setError('Demo account not available. Please try again later.');
+        } finally {
+            setDemoLoading(false);
         }
     };
 
@@ -67,6 +85,34 @@ export default function Login() {
                     <p style={{ color: 'rgba(226,232,240,0.5)', marginTop: '0.5rem' }}>
                         Sign in to your StudyMate account
                     </p>
+                </div>
+
+                {/* Try Demo Button — prominent, at the top */}
+                <button
+                    id="try-demo"
+                    onClick={handleTryDemo}
+                    disabled={demoLoading || loading}
+                    className="btn-secondary"
+                    style={{
+                        width: '100%',
+                        justifyContent: 'center',
+                        padding: '0.875rem',
+                        fontSize: '1rem',
+                        marginBottom: '1.5rem',
+                        background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.15))',
+                        border: '1px solid rgba(99,102,241,0.3)',
+                    }}
+                >
+                    {demoLoading ? '⏳ Loading demo...' : '🚀 Try Demo — No sign up needed'}
+                </button>
+
+                {/* Divider */}
+                <div className="flex items-center" style={{ gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div style={{ flex: 1, height: 1, background: 'rgba(99,102,241,0.15)' }} />
+                    <span style={{ fontSize: '0.75rem', color: 'rgba(226,232,240,0.3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        or sign in
+                    </span>
+                    <div style={{ flex: 1, height: 1, background: 'rgba(99,102,241,0.15)' }} />
                 </div>
 
                 {/* Error message */}
@@ -121,7 +167,7 @@ export default function Login() {
                         id="login-submit"
                         type="submit"
                         className="btn-primary"
-                        disabled={loading}
+                        disabled={loading || demoLoading}
                         style={{
                             width: '100%',
                             justifyContent: 'center',
@@ -140,6 +186,11 @@ export default function Login() {
                     <Link to="/register" className="gradient-text font-semibold" style={{ textDecoration: 'none' }}>
                         Sign up
                     </Link>
+                </p>
+
+                {/* Privacy note */}
+                <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.7rem', color: 'rgba(226,232,240,0.25)' }}>
+                    🔒 Use "Try Demo" to explore without sharing personal data
                 </p>
             </div>
         </div>
