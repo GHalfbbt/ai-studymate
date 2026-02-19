@@ -36,7 +36,6 @@ class WorkspaceResponse(BaseModel):
 class CourseCreate(BaseModel):
     """Schema for creating a new course within a workspace."""
     name: str = Field(..., min_length=1, max_length=255, description="Course name")
-    description: Optional[str] = Field(None, description="Course description")
 
 
 class CourseResponse(BaseModel):
@@ -54,7 +53,6 @@ class CourseResponse(BaseModel):
 class SubjectCreate(BaseModel):
     """Schema for creating a new subject within a course."""
     name: str = Field(..., min_length=1, max_length=255, description="Subject name")
-    description: Optional[str] = Field(None, description="Subject description")
     color: Optional[str] = Field(
         "#3B82F6",
         pattern=r"^#[0-9A-Fa-f]{6}$",

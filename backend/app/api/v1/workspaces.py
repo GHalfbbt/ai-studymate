@@ -39,7 +39,15 @@ async def list_workspaces(
         .order_by(Workspace.created_at.desc())
         .all()
     )
-    return workspaces
+    # Calculate course counts
+    results = []
+    for ws in workspaces:
+        course_count = db.query(Course).filter(Course.workspace_id == ws.id).count()
+        results.append(WorkspaceResponse(
+            id=ws.id, name=ws.name, description=ws.description,
+            created_at=ws.created_at, course_count=course_count,
+        ))
+    return results
 
 
 @router.post("/", response_model=WorkspaceResponse, status_code=201, summary="Create workspace")
@@ -76,7 +84,15 @@ async def list_courses(
         .order_by(Course.created_at.desc())
         .all()
     )
-    return courses
+    # Calculate subject counts
+    results = []
+    for c in courses:
+        subject_count = db.query(Subject).filter(Subject.course_id == c.id).count()
+        results.append(CourseResponse(
+            id=c.id, workspace_id=c.workspace_id, name=c.name,
+            created_at=c.created_at, subject_count=subject_count,
+        ))
+    return results
 
 
 @router.post("/{workspace_id}/courses", response_model=CourseResponse, status_code=201, summary="Create course")
@@ -90,7 +106,6 @@ async def create_course(
     workspace = _get_user_workspace(workspace_id, current_user, db)
     course = Course(
         name=data.name,
-        description=data.description,
         workspace_id=workspace.id,
     )
     db.add(course)
@@ -152,7 +167,7 @@ async def create_subject(
 
     subject = Subject(
         name=data.name,
-        description=data.description,
+        color=data.color,
         course_id=course.id,
     )
     db.add(subject)
