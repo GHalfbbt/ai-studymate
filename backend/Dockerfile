@@ -28,14 +28,8 @@ COPY . .
 # Create necessary directories for data persistence
 RUN mkdir -p /app/data /app/uploads
 
-# Make entrypoint script executable
-RUN chmod +x /app/entrypoint.sh
-
 # Expose API port
 EXPOSE 8000
-
-# Use entrypoint to run migrations before starting the app
-ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Default command (overridden by docker-compose for development)
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
