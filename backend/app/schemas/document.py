@@ -10,21 +10,28 @@ from pydantic import BaseModel, Field
 
 
 class DocumentUpload(BaseModel):
-    """Schema for document upload metadata (sent alongside the file)."""
-    subject_id: UUID = Field(..., description="Subject to associate the document with")
+    """Schema for document upload metadata."""
+    workspace_id: Optional[UUID] = None
+    course_id: Optional[UUID] = None
+    subject_id: Optional[UUID] = None
+    topic_id: Optional[UUID] = None
 
 
 class DocumentResponse(BaseModel):
-    """Schema for document response."""
+    """Schema for document response — supports multi-level attachment."""
     id: UUID
-    subject_id: UUID
+    user_id: Optional[UUID] = None
+    workspace_id: Optional[UUID] = None
+    course_id: Optional[UUID] = None
+    subject_id: Optional[UUID] = None
+    topic_id: Optional[UUID] = None
     filename: str
     file_type: str
-    file_size: Optional[int]
+    file_size: Optional[int] = None
     processing_status: str
-    processing_error: Optional[str]
-    language: str
-    chunk_count: int
+    processing_error: Optional[str] = None
+    language: str = "en"
+    chunk_count: int = 0
     created_at: datetime
 
     class Config:

@@ -2,7 +2,8 @@
 Document management API endpoints.
 
 Provides file upload, listing, and deletion for study materials.
-Documents are processed through the ingestion pipeline after upload.
+Documents can be attached at any hierarchy level:
+  workspace → course → subject → topic
 """
 
 from typing import Optional
@@ -14,7 +15,6 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_current_user
 from app.models.user import User
 from app.models.document import Document
-from app.models.subject import Subject
 from app.schemas.document import DocumentResponse, DocumentListResponse
 from app.services.storage import StorageService
 
@@ -33,70 +33,93 @@ storage_service = StorageService()
 async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(..., description="Document file (PDF, DOCX, TXT, or image)"),
-    subject_id: UUID = Form(..., description="Subject to associate the document with"),
+    workspace_id: Optional[UUID] = Form(None, description="Workspace to attach to"),
+    course_id: Optional[UUID] = Form(None, description="Course to attach to"),
+    subject_id: Optional[UUID] = Form(None, description="Subject to attach to"),
+    topic_id: Optional[UUID] = Form(None, description="Topic to attach to"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Upload a study document for processing.
 
-    The file is saved to storage and then processed asynchronously:
-    1. Text extraction (PDF/DOCX/TXT)
+    Attach to ANY hierarchy level. At least one ID must be provided.
+    The most specific level wins for organization purposes.
+
+    Processing pipeline (async):
+    1. Text extraction (PDF with OCR / DOCX / TXT)
     2. Text chunking with overlap
-    3. Embedding generation
-    4. Vector store indexing
-
-    The document starts with status 'pending' and transitions to
-    'processing' → 'completed' or 'failed'.
-
-    Args:
-        file: The uploaded file
-        subject_id: Subject UUID to associate the document with
-        db: Database session (injected)
-        current_user: Authenticated user (injected)
-
-    Returns:
-        DocumentResponse: Created document record with processing status
+    3. Embedding generation (sentence-transformers)
+    4. Vector store indexing (ChromaDB)
     """
-    # Verify the subject exists and belongs to the current user
-    subject = db.query(Subject).filter(Subject.id == subject_id).first()
-    if not subject:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Subject not found",
-        )
-
-    # Verify ownership through the hierarchy:
-    # Subject → Course → Workspace → User
-    from app.models.course import Course
-    from app.models.workspace import Workspace
-
-    course = db.query(Course).filter(Course.id == subject.course_id).first()
-    if not course:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found",
-        )
-
-    workspace = db.query(Workspace).filter(Workspace.id == course.workspace_id).first()
-    if not workspace or workspace.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have permission to upload to this subject",
-        )
-
-    # Save file to storage
-    try:
-        file_info = await storage_service.save_file(file, subject_id)
-    except ValueError as e:
+    # Validate: at least one hierarchy ID must be provided
+    if not any([workspace_id, course_id, subject_id, topic_id]):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail="At least one of workspace_id, course_id, subject_id, or topic_id must be provided",
         )
 
-    # Create document record with 'pending' status
+    # Verify ownership through the hierarchy
+    from app.models.workspace import Workspace
+    from app.models.course import Course
+    from app.models.subject import Subject
+    from app.models.topic import Topic
+
+    # Determine the target and verify ownership
+    owner_workspace_id = None
+
+    if topic_id:
+        topic = db.query(Topic).filter(Topic.id == topic_id).first()
+        if not topic:
+            raise HTTPException(status_code=404, detail="Topic not found")
+        subject = db.query(Subject).filter(Subject.id == topic.subject_id).first()
+        course = db.query(Course).filter(Course.id == subject.course_id).first()
+        owner_workspace_id = course.workspace_id
+        # Auto-fill parent IDs
+        subject_id = subject_id or topic.subject_id
+        course_id = course_id or subject.course_id
+        workspace_id = workspace_id or course.workspace_id
+
+    elif subject_id:
+        subject = db.query(Subject).filter(Subject.id == subject_id).first()
+        if not subject:
+            raise HTTPException(status_code=404, detail="Subject not found")
+        course = db.query(Course).filter(Course.id == subject.course_id).first()
+        owner_workspace_id = course.workspace_id
+        course_id = course_id or subject.course_id
+        workspace_id = workspace_id or course.workspace_id
+
+    elif course_id:
+        course = db.query(Course).filter(Course.id == course_id).first()
+        if not course:
+            raise HTTPException(status_code=404, detail="Course not found")
+        owner_workspace_id = course.workspace_id
+        workspace_id = workspace_id or course.workspace_id
+
+    elif workspace_id:
+        owner_workspace_id = workspace_id
+
+    # Verify workspace belongs to user
+    workspace = db.query(Workspace).filter(
+        Workspace.id == owner_workspace_id, Workspace.user_id == current_user.id
+    ).first()
+    if not workspace:
+        raise HTTPException(status_code=403, detail="You don't have permission to upload here")
+
+    # Save file to storage
+    storage_key = subject_id or course_id or workspace_id
+    try:
+        file_info = await storage_service.save_file(file, storage_key)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Create document record
     document = Document(
+        user_id=current_user.id,
+        workspace_id=workspace_id,
+        course_id=course_id,
         subject_id=subject_id,
+        topic_id=topic_id,
         filename=file_info["filename"],
         file_type=file_info["file_type"],
         file_path=file_info["file_path"],
@@ -107,11 +130,9 @@ async def upload_document(
     db.commit()
     db.refresh(document)
 
-    # Schedule async ingestion in background
-    # The actual ingestion will be triggered when the IngestorService
-    # is fully integrated (requires embedder + vector store initialization)
+    # Schedule async processing
     background_tasks.add_task(
-        _process_document,
+        _process_document_sync,
         document_id=document.id,
         file_path=file_info["file_path"],
         filename=file_info["filename"],
@@ -123,36 +144,28 @@ async def upload_document(
     return document
 
 
-async def _process_document(
+def _process_document_sync(
     document_id: UUID,
     file_path: str,
     filename: str,
     file_type: str,
-    subject_id: UUID,
+    subject_id: Optional[UUID],
     user_id: UUID,
 ):
     """
-    Background task for document processing.
+    Background task for document processing (synchronous wrapper).
 
-    Runs the full ingestion pipeline asynchronously after the
-    upload HTTP response has been sent.
-
-    Args:
-        document_id: Document record ID
-        file_path: Path to saved file
-        filename: Original filename
-        file_type: File type category
-        subject_id: Target subject
-        user_id: Owner user
+    BackgroundTasks runs this in a thread pool. The actual ingestion
+    pipeline extracts text, chunks it, generates embeddings, and
+    stores vectors in ChromaDB.
     """
+    import asyncio
     from app.core.database import SessionLocal
 
-    # Mensaje en español para el desarrollador
     print(f"🔄 Iniciando procesamiento en background: {filename}")
 
     db = SessionLocal()
     try:
-        # Import services here to avoid circular imports
         from app.services.embedder import EmbedderService
         from app.services.vector_store import VectorStore
         from app.services.ingestor import IngestorService
@@ -167,19 +180,25 @@ async def _process_document(
             document.processing_status = "processing"
             db.commit()
 
-        # Run the ingestion pipeline
-        await ingestor.ingest_document(
-            file_path=file_path,
-            filename=filename,
-            file_type=file_type,
-            subject_id=subject_id,
-            user_id=user_id,
-        )
+        # Run the async ingestion pipeline in a new event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(
+                ingestor.ingest_document(
+                    file_path=file_path,
+                    filename=filename,
+                    file_type=file_type,
+                    subject_id=subject_id,
+                    user_id=user_id,
+                )
+            )
+        finally:
+            loop.close()
 
         print(f"✅ Documento procesado exitosamente: {filename}")
 
     except Exception as e:
-        # Mark as failed if anything goes wrong
         print(f"❌ Error procesando documento {filename}: {str(e)}")
         document = db.query(Document).filter(Document.id == document_id).first()
         if document:
@@ -196,45 +215,32 @@ async def _process_document(
     summary="List documents",
 )
 async def list_documents(
+    workspace_id: Optional[UUID] = None,
+    course_id: Optional[UUID] = None,
     subject_id: Optional[UUID] = None,
+    topic_id: Optional[UUID] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     List documents owned by the current user.
-
-    Can be filtered by subject_id to show only documents
-    belonging to a specific subject.
-
-    Args:
-        subject_id: Optional filter by subject
-        db: Database session (injected)
-        current_user: Authenticated user (injected)
-
-    Returns:
-        DocumentListResponse: List of documents with total count
+    Can filter by any hierarchy level.
     """
-    from app.models.workspace import Workspace
-    from app.models.course import Course
+    # Use user_id directly (no complex JOINs)
+    query = db.query(Document).filter(Document.user_id == current_user.id)
 
-    # Build query for user's documents through the hierarchy
-    query = (
-        db.query(Document)
-        .join(Subject)
-        .join(Course)
-        .join(Workspace)
-        .filter(Workspace.user_id == current_user.id)
-    )
-
+    if workspace_id:
+        query = query.filter(Document.workspace_id == workspace_id)
+    if course_id:
+        query = query.filter(Document.course_id == course_id)
     if subject_id:
         query = query.filter(Document.subject_id == subject_id)
+    if topic_id:
+        query = query.filter(Document.topic_id == topic_id)
 
     documents = query.order_by(Document.created_at.desc()).all()
 
-    return DocumentListResponse(
-        documents=documents,
-        total=len(documents),
-    )
+    return DocumentListResponse(documents=documents, total=len(documents))
 
 
 @router.get(
@@ -247,38 +253,14 @@ async def get_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Get details for a specific document.
-
-    Args:
-        document_id: Document UUID
-        db: Database session (injected)
-        current_user: Authenticated user (injected)
-
-    Returns:
-        DocumentResponse: Document details including processing status
-    """
-    from app.models.workspace import Workspace
-    from app.models.course import Course
-
-    document = (
-        db.query(Document)
-        .join(Subject)
-        .join(Course)
-        .join(Workspace)
-        .filter(
-            Document.id == document_id,
-            Workspace.user_id == current_user.id,
-        )
-        .first()
-    )
+    """Get details for a specific document."""
+    document = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == current_user.id,
+    ).first()
 
     if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found",
-        )
-
+        raise HTTPException(status_code=404, detail="Document not found")
     return document
 
 
@@ -292,43 +274,21 @@ async def delete_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Delete a document and its associated chunks and vectors.
-
-    Args:
-        document_id: Document UUID to delete
-        db: Database session (injected)
-        current_user: Authenticated user (injected)
-    """
-    from app.models.workspace import Workspace
-    from app.models.course import Course
-
-    document = (
-        db.query(Document)
-        .join(Subject)
-        .join(Course)
-        .join(Workspace)
-        .filter(
-            Document.id == document_id,
-            Workspace.user_id == current_user.id,
-        )
-        .first()
-    )
+    """Delete a document, its chunks, and its vectors."""
+    document = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == current_user.id,
+    ).first()
 
     if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found",
-        )
+        raise HTTPException(status_code=404, detail="Document not found")
 
     # Delete vectors from ChromaDB
     try:
         from app.services.vector_store import VectorStore
-
         vector_store = VectorStore()
         vector_store.delete_by_document(str(document_id))
     except Exception as e:
-        # Log but don't fail the deletion
         print(f"⚠️ Error eliminando vectores: {str(e)}")
 
     # Delete file from storage

@@ -87,8 +87,8 @@ export default function App() {
     <Routes>
       {/* Authenticated routes (inside Layout with sidebar) */}
       <Route element={<RequireAuth><Layout /></RequireAuth>}>
-        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/workspaces" element={<Workspaces />} />
+        <Route path="/dashboard" element={<Navigate to="/workspaces" replace />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/exams" element={<Exams />} />
         <Route path="/flashcards" element={<Flashcards />} />
