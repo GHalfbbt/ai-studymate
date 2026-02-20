@@ -8,7 +8,9 @@ import apiClient from './client';
 // --- Types ---
 
 export interface FlashcardGenerateRequest {
-  subject_id: string;
+  subject_id?: string;
+  course_id?: string;
+  workspace_id?: string;
   document_id?: string;
   count: number;
 }

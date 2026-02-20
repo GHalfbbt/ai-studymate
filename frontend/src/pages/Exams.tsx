@@ -21,19 +21,23 @@ import {
 
 type View = 'list' | 'generate' | 'take' | 'results';
 
-interface SubjectOption {
+interface ScopeOption {
   id: string;
   name: string;
-  courseName: string;
+  label: string;
+  type: 'subject' | 'course' | 'workspace';
+  courseId?: string;
+  workspaceId?: string;
 }
 
 export default function Exams() {
   // View state
   const [view, setView] = useState<View>('list');
 
-  // Subject selection
-  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
-  const [selectedSubject, setSelectedSubject] = useState('');
+  // Scope selection (subject, course, or workspace)
+  const [scopes, setScopes] = useState<ScopeOption[]>([]);
+  const [selectedScope, setSelectedScope] = useState('');
+  const [selectedType, setSelectedType] = useState<'subject' | 'course' | 'workspace'>('subject');
 
   // Exam list
   const [exams, setExams] = useState<Exam[]>([]);
@@ -56,9 +60,9 @@ export default function Exams() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Load subjects on mount
+  // Load scopes on mount
   useEffect(() => {
-    loadSubjects();
+    loadScopes();
   }, []);
 
   // Timer for exam taking
@@ -68,30 +72,43 @@ export default function Exams() {
     return () => clearInterval(timer);
   }, [view]);
 
-  async function loadSubjects() {
+  async function loadScopes() {
     try {
       const wsList = await listWorkspaces();
-      const subs: SubjectOption[] = [];
+      const opts: ScopeOption[] = [];
       for (const ws of wsList) {
+        // Add workspace-level option
+        opts.push({
+          id: ws.id, name: ws.name,
+          label: `🗂️ ${ws.name} (all docs)`,
+          type: 'workspace', workspaceId: ws.id,
+        });
         const courses = await listCourses(ws.id);
         for (const course of courses) {
+          // Add course-level option
+          opts.push({
+            id: course.id, name: course.name,
+            label: `  📖 ${course.name} (all docs)`,
+            type: 'course', courseId: course.id, workspaceId: ws.id,
+          });
           const subjects = await listSubjects(ws.id, course.id);
           for (const subject of subjects) {
-            subs.push({
-              id: subject.id,
-              name: subject.name,
-              courseName: course.name,
+            opts.push({
+              id: subject.id, name: subject.name,
+              label: `    📝 ${course.name} → ${subject.name}`,
+              type: 'subject', courseId: course.id, workspaceId: ws.id,
             });
           }
         }
       }
-      setSubjects(subs);
-      if (subs.length > 0) {
-        setSelectedSubject(subs[0].id);
-        loadExams(subs[0].id);
+      setScopes(opts);
+      if (opts.length > 0) {
+        setSelectedScope(opts[0].id);
+        setSelectedType(opts[0].type);
+        if (opts[0].type === 'subject') loadExams(opts[0].id);
       }
     } catch {
-      console.error('Failed to load subjects');
+      console.error('Failed to load scopes');
     }
   }
 
@@ -105,22 +122,27 @@ export default function Exams() {
   }
 
   async function handleGenerate() {
-    if (!selectedSubject) return;
+    if (!selectedScope) return;
     setLoading(true);
     setError('');
     try {
-      const exam = await generateExam({
-        subject_id: selectedSubject,
+      const scope = scopes.find(s => s.id === selectedScope);
+      const req: any = {
         mc_count: mcCount,
         short_answer_count: shortCount,
         difficulty,
         title: customTitle || undefined,
-      });
+      };
+      if (scope?.type === 'subject') req.subject_id = selectedScope;
+      else if (scope?.type === 'course') req.course_id = selectedScope;
+      else if (scope?.type === 'workspace') req.workspace_id = selectedScope;
+
+      const exam = await generateExam(req);
       setCurrentExam(exam);
       setAnswers({});
       setTimeElapsed(0);
       setView('take');
-      loadExams(selectedSubject);
+      if (selectedType === 'subject') loadExams(selectedScope);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to generate exam');
     } finally {
@@ -174,19 +196,22 @@ export default function Exams() {
           </button>
         </div>
 
-        {/* Subject filter */}
+        {/* Scope filter */}
         <select
           className="input"
-          value={selectedSubject}
+          value={selectedScope}
           onChange={(e) => {
-            setSelectedSubject(e.target.value);
-            loadExams(e.target.value);
+            const scope = scopes.find(s => s.id === e.target.value);
+            setSelectedScope(e.target.value);
+            setSelectedType(scope?.type || 'subject');
+            if (scope?.type === 'subject') loadExams(e.target.value);
+            else setExams([]);
           }}
           style={{ marginBottom: '1rem', maxWidth: 400 }}
         >
-          {subjects.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.courseName} → {s.name}
+          {scopes.map((s) => (
+            <option key={`${s.type}-${s.id}`} value={s.id}>
+              {s.label}
             </option>
           ))}
         </select>
@@ -233,12 +258,16 @@ export default function Exams() {
         )}
 
         <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {/* Subject */}
+          {/* Scope */}
           <label>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Subject</span>
-            <select className="input" value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)}>
-              {subjects.map((s) => (
-                <option key={s.id} value={s.id}>{s.courseName} → {s.name}</option>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Source</span>
+            <select className="input" value={selectedScope} onChange={(e) => {
+              const scope = scopes.find(s => s.id === e.target.value);
+              setSelectedScope(e.target.value);
+              setSelectedType(scope?.type || 'subject');
+            }}>
+              {scopes.map((s) => (
+                <option key={`${s.type}-${s.id}`} value={s.id}>{s.label}</option>
               ))}
             </select>
           </label>

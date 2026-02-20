@@ -86,43 +86,44 @@ Rules:
         user_id: UUID,
         document_ids: Optional[List[UUID]] = None,
         max_chunks: int = 20,
+        course_id: Optional[UUID] = None,
+        workspace_id: Optional[UUID] = None,
     ) -> List[str]:
         """
         Retrieve document chunks for exam generation.
 
-        Args:
-            subject_id: Subject to get chunks from
-            user_id: User ID for access control
-            document_ids: Optional specific document filter
-            max_chunks: Maximum number of chunks to retrieve
-
-        Returns:
-            List of chunk text strings
+        Supports filtering by subject_id, course_id, or workspace_id.
+        Priority: document_ids > subject_id > course_id > workspace_id.
         """
         query = (
             self.db.query(DocumentChunk)
             .join(Document)
-            .filter(
-                Document.subject_id == subject_id,
-                Document.processing_status == "completed",
-            )
+            .filter(Document.processing_status == "completed")
         )
 
         if document_ids:
             query = query.filter(Document.id.in_(document_ids))
+        elif subject_id:
+            query = query.filter(Document.subject_id == subject_id)
+        elif course_id:
+            query = query.filter(Document.course_id == course_id)
+        elif workspace_id:
+            query = query.filter(Document.workspace_id == workspace_id)
 
         chunks = query.order_by(DocumentChunk.chunk_index).limit(max_chunks).all()
         return [chunk.content for chunk in chunks]
 
     def generate_exam(
         self,
-        subject_id: UUID,
-        user_id: UUID,
+        subject_id: Optional[UUID] = None,
+        user_id: UUID = None,
         mc_count: int = 5,
         short_answer_count: int = 3,
         difficulty: str = "medium",
         title: Optional[str] = None,
         document_ids: Optional[List[UUID]] = None,
+        course_id: Optional[UUID] = None,
+        workspace_id: Optional[UUID] = None,
     ) -> Exam:
         """
         Generate an exam from study materials.
@@ -144,7 +145,8 @@ Rules:
         """
         # Step 1: Get document chunks
         chunks = self._get_chunks_for_subject(
-            subject_id, user_id, document_ids
+            subject_id, user_id, document_ids,
+            course_id=course_id, workspace_id=workspace_id,
         )
 
         if not chunks:

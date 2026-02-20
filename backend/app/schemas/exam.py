@@ -11,7 +11,9 @@ from pydantic import BaseModel, Field
 
 class ExamGenerate(BaseModel):
     """Schema for exam generation request."""
-    subject_id: UUID = Field(..., description="Subject to generate exam from")
+    subject_id: Optional[UUID] = Field(None, description="Subject to generate exam from")
+    course_id: Optional[UUID] = Field(None, description="Course to generate exam from (all docs)")
+    workspace_id: Optional[UUID] = Field(None, description="Workspace to generate exam from (all docs)")
     title: Optional[str] = Field(None, description="Custom exam title")
     mc_count: int = Field(
         default=5, ge=0, le=30, description="Number of multiple choice questions"

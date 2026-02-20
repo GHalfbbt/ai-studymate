@@ -8,7 +8,9 @@ import apiClient from './client';
 // --- Types ---
 
 export interface ExamGenerateRequest {
-  subject_id: string;
+  subject_id?: string;
+  course_id?: string;
+  workspace_id?: string;
   title?: string;
   mc_count: number;
   short_answer_count: number;

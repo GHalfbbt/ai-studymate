@@ -47,12 +47,21 @@ def generate_flashcards(
     llm = LLMClient()
     generator = FlashcardGeneratorService(db=db, llm=llm)
 
+    # Validate at least one scope is provided
+    if not any([data.subject_id, data.course_id, data.workspace_id, data.document_id]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one of subject_id, course_id, workspace_id, or document_id must be provided",
+        )
+
     try:
         flashcards = generator.generate_flashcards(
             subject_id=data.subject_id,
             user_id=current_user.id,
             count=data.count,
             document_id=data.document_id,
+            course_id=data.course_id,
+            workspace_id=data.workspace_id,
         )
     except ValueError as e:
         raise HTTPException(

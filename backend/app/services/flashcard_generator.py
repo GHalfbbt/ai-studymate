@@ -64,42 +64,44 @@ Rules:
 
     def _get_chunks(
         self,
-        subject_id: UUID,
+        subject_id: Optional[UUID] = None,
         document_id: Optional[UUID] = None,
+        course_id: Optional[UUID] = None,
+        workspace_id: Optional[UUID] = None,
         max_chunks: int = 15,
     ) -> List[str]:
         """
         Retrieve document chunks for flashcard generation.
 
-        Args:
-            subject_id: Subject to get chunks from
-            document_id: Optional specific document filter
-            max_chunks: Maximum chunks to retrieve
-
-        Returns:
-            List of chunk text strings
+        Supports filtering by subject_id, course_id, or workspace_id.
+        Priority: document_id > subject_id > course_id > workspace_id.
         """
         query = (
             self.db.query(DocumentChunk)
             .join(Document)
-            .filter(
-                Document.subject_id == subject_id,
-                Document.processing_status == "completed",
-            )
+            .filter(Document.processing_status == "completed")
         )
 
         if document_id:
             query = query.filter(Document.id == document_id)
+        elif subject_id:
+            query = query.filter(Document.subject_id == subject_id)
+        elif course_id:
+            query = query.filter(Document.course_id == course_id)
+        elif workspace_id:
+            query = query.filter(Document.workspace_id == workspace_id)
 
         chunks = query.order_by(DocumentChunk.chunk_index).limit(max_chunks).all()
         return [chunk.content for chunk in chunks]
 
     def generate_flashcards(
         self,
-        subject_id: UUID,
-        user_id: UUID,
+        subject_id: Optional[UUID] = None,
+        user_id: UUID = None,
         count: int = 10,
         document_id: Optional[UUID] = None,
+        course_id: Optional[UUID] = None,
+        workspace_id: Optional[UUID] = None,
     ) -> List[Flashcard]:
         """
         Generate flashcards from study materials.
@@ -117,7 +119,10 @@ Rules:
             ValueError: If no content available for generation
         """
         # Step 1: Get document chunks
-        chunks = self._get_chunks(subject_id, document_id)
+        chunks = self._get_chunks(
+            subject_id=subject_id, document_id=document_id,
+            course_id=course_id, workspace_id=workspace_id,
+        )
 
         if not chunks:
             raise ValueError(

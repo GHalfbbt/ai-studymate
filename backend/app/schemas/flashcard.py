@@ -11,7 +11,9 @@ from pydantic import BaseModel, Field
 
 class FlashcardGenerate(BaseModel):
     """Schema for flashcard generation request."""
-    subject_id: UUID = Field(..., description="Subject to generate flashcards from")
+    subject_id: Optional[UUID] = Field(None, description="Subject to generate flashcards from")
+    course_id: Optional[UUID] = Field(None, description="Course to generate from (all docs)")
+    workspace_id: Optional[UUID] = Field(None, description="Workspace to generate from (all docs)")
     document_id: Optional[UUID] = Field(
         None, description="Specific document to generate from"
     )

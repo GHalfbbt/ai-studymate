@@ -51,6 +51,13 @@ def generate_exam(
     llm = LLMClient()
     generator = ExamGeneratorService(db=db, llm=llm)
 
+    # Validate at least one scope is provided
+    if not any([data.subject_id, data.course_id, data.workspace_id, data.document_ids]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one of subject_id, course_id, workspace_id, or document_ids must be provided",
+        )
+
     try:
         exam = generator.generate_exam(
             subject_id=data.subject_id,
@@ -60,6 +67,8 @@ def generate_exam(
             difficulty=data.difficulty,
             title=data.title,
             document_ids=data.document_ids,
+            course_id=data.course_id,
+            workspace_id=data.workspace_id,
         )
     except ValueError as e:
         raise HTTPException(

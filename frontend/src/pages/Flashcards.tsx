@@ -18,16 +18,18 @@ import {
   type Flashcard,
 } from '../api/flashcards';
 
-interface SubjectOption {
+interface ScopeOption {
   id: string;
   name: string;
-  courseName: string;
+  label: string;
+  type: 'subject' | 'course' | 'workspace';
 }
 
 export default function Flashcards() {
-  // Subject selection
-  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
-  const [selectedSubject, setSelectedSubject] = useState('');
+  // Scope selection
+  const [scopes, setScopes] = useState<ScopeOption[]>([]);
+  const [selectedScope, setSelectedScope] = useState('');
+  const [selectedType, setSelectedType] = useState<'subject' | 'course' | 'workspace'>('subject');
 
   // Flashcards data
   const [cards, setCards] = useState<Flashcard[]>([]);
@@ -43,33 +45,32 @@ export default function Flashcards() {
   const [mode, setMode] = useState<'list' | 'review'>('list');
 
   useEffect(() => {
-    loadSubjects();
+    loadScopes();
   }, []);
 
-  async function loadSubjects() {
+  async function loadScopes() {
     try {
       const wsList = await listWorkspaces();
-      const subs: SubjectOption[] = [];
+      const opts: ScopeOption[] = [];
       for (const ws of wsList) {
+        opts.push({ id: ws.id, name: ws.name, label: `🗂️ ${ws.name} (all docs)`, type: 'workspace' });
         const courses = await listCourses(ws.id);
         for (const course of courses) {
+          opts.push({ id: course.id, name: course.name, label: `  📖 ${course.name} (all docs)`, type: 'course' });
           const subjectList = await listSubjects(ws.id, course.id);
           for (const subject of subjectList) {
-            subs.push({
-              id: subject.id,
-              name: subject.name,
-              courseName: course.name,
-            });
+            opts.push({ id: subject.id, name: subject.name, label: `    📝 ${course.name} → ${subject.name}`, type: 'subject' });
           }
         }
       }
-      setSubjects(subs);
-      if (subs.length > 0) {
-        setSelectedSubject(subs[0].id);
-        loadCards(subs[0].id);
+      setScopes(opts);
+      if (opts.length > 0) {
+        setSelectedScope(opts[0].id);
+        setSelectedType(opts[0].type);
+        if (opts[0].type === 'subject') loadCards(opts[0].id);
       }
     } catch {
-      console.error('Failed to load subjects');
+      console.error('Failed to load scopes');
     }
   }
 
@@ -83,14 +84,17 @@ export default function Flashcards() {
   }
 
   async function handleGenerate() {
-    if (!selectedSubject) return;
+    if (!selectedScope) return;
     setLoading(true);
     setError('');
     try {
-      const newCards = await generateFlashcards({
-        subject_id: selectedSubject,
-        count: genCount,
-      });
+      const scope = scopes.find(s => s.id === selectedScope);
+      const req: any = { count: genCount };
+      if (scope?.type === 'subject') req.subject_id = selectedScope;
+      else if (scope?.type === 'course') req.course_id = selectedScope;
+      else if (scope?.type === 'workspace') req.workspace_id = selectedScope;
+
+      const newCards = await generateFlashcards(req);
       setCards((prev) => [...newCards, ...prev]);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to generate flashcards');
@@ -117,14 +121,14 @@ export default function Flashcards() {
       setMode('list');
       setCurrentIndex(0);
       setFlipped(false);
-      loadCards(selectedSubject);
+      if (selectedType === 'subject') loadCards(selectedScope);
     }
   }
 
   async function handleExport() {
-    if (!selectedSubject) return;
+    if (!selectedScope || selectedType !== 'subject') return;
     try {
-      const csv = await exportFlashcardsCSV(selectedSubject);
+      const csv = await exportFlashcardsCSV(selectedScope);
       const blob = new Blob([csv], { type: 'text/tab-separated-values' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -257,22 +261,25 @@ export default function Flashcards() {
         </div>
       )}
 
-      {/* Subject selector + generate */}
+      {/* Scope selector + generate */}
       <div className="card" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <label style={{ flex: 2 }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Subject</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Source</span>
             <select
               className="input"
-              value={selectedSubject}
+              value={selectedScope}
               onChange={(e) => {
-                setSelectedSubject(e.target.value);
-                loadCards(e.target.value);
+                const scope = scopes.find(s => s.id === e.target.value);
+                setSelectedScope(e.target.value);
+                setSelectedType(scope?.type || 'subject');
+                if (scope?.type === 'subject') loadCards(e.target.value);
+                else setCards([]);
               }}
             >
-              {subjects.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.courseName} → {s.name}
+              {scopes.map((s) => (
+                <option key={`${s.type}-${s.id}`} value={s.id}>
+                  {s.label}
                 </option>
               ))}
             </select>
