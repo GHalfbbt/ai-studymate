@@ -13,7 +13,7 @@ import {
     listSubjects, createSubject, updateSubject, deleteSubject,
     listTopics, createTopic, updateTopic, deleteTopic,
 } from '../api/workspaces';
-import { uploadDocument, listDocuments, deleteDocument } from '../api/documents';
+import { uploadDocument, listDocuments, deleteDocument, getDocumentDownloadUrl } from '../api/documents';
 import type { Workspace, Course, Subject, Topic, Document } from '../types';
 import Spinner from '../components/common/Spinner';
 
@@ -362,7 +362,24 @@ export default function Workspaces() {
                                     <div className="flex items-center gap-3 min-w-0">
                                         <span className="text-lg">{doc.file_type === 'pdf' ? '📕' : doc.file_type === 'docx' ? '📘' : '📄'}</span>
                                         <div className="min-w-0">
-                                            <div className="text-sm font-medium text-surface-100 truncate">{doc.filename}</div>
+                                            <a
+                                                href={getDocumentDownloadUrl(doc.id)}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-sm font-medium text-surface-100 truncate hover:text-primary-400 hover:underline cursor-pointer block"
+                                                title="Click to open document"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    const token = localStorage.getItem('token');
+                                                    const url = getDocumentDownloadUrl(doc.id);
+                                                    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+                                                        .then(r => r.blob())
+                                                        .then(blob => {
+                                                            const blobUrl = URL.createObjectURL(blob);
+                                                            window.open(blobUrl, '_blank');
+                                                        });
+                                                }}
+                                            >{doc.filename}</a>
                                             <div className="text-xs text-surface-200/70">
                                                 {doc.file_size ? `${(doc.file_size / 1024 / 1024).toFixed(1)} MB` : '—'} · {doc.chunk_count} chunks
                                             </div>

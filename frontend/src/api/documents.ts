@@ -51,5 +51,12 @@ export async function getDocument(documentId: string): Promise<Document> {
 }
 
 export async function deleteDocument(documentId: string): Promise<void> {
-    await apiClient.delete(`/documents/${documentId}`);
+  await apiClient.delete(`/documents/${documentId}`);
+}
+
+/**
+ * Get the download URL for a document.
+ */
+export function getDocumentDownloadUrl(documentId: string): string {
+  return `${apiClient.defaults.baseURL}/documents/${documentId}/download`;
 }

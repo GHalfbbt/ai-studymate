@@ -265,6 +265,46 @@ async def get_document(
     return document
 
 
+@router.get(
+    "/{document_id}/download",
+    summary="Download original document file",
+)
+async def download_document(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Download the original uploaded file for viewing or saving."""
+    from fastapi.responses import FileResponse
+    import os
+
+    document = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == current_user.id,
+    ).first()
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    if not document.file_path or not os.path.exists(document.file_path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    # Determine media type for inline display
+    media_types = {
+        "pdf": "application/pdf",
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "txt": "text/plain",
+        "image": "image/jpeg",
+    }
+    media_type = media_types.get(document.file_type, "application/octet-stream")
+
+    return FileResponse(
+        path=document.file_path,
+        filename=document.filename,
+        media_type=media_type,
+    )
+
+
 @router.delete(
     "/{document_id}",
     status_code=status.HTTP_204_NO_CONTENT,
