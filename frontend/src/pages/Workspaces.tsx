@@ -370,7 +370,7 @@ export default function Workspaces() {
                                                 title="Click to open document"
                                                 onClick={(e) => {
                                                     e.preventDefault();
-                                                    const token = localStorage.getItem('token');
+                                                    const token = localStorage.getItem('access_token');
                                                     const url = getDocumentDownloadUrl(doc.id);
                                                     fetch(url, { headers: { Authorization: `Bearer ${token}` } })
                                                         .then(r => r.blob())
