@@ -20,12 +20,18 @@ class Document(Base):
     """
     Uploaded study material document.
 
-    Tracks the original file, its processing status, and metadata.
-    Processing pipeline: pending -> processing -> completed/failed
+    A document can be attached to any level of the hierarchy:
+      - workspace_id only → general workspace document (e.g. exam bases)
+      - course_id → associated with a specific course
+      - subject_id → specific subject material
+      - topic_id → specific topic within a subject (most granular)
+
+    Processing pipeline: pending → processing → completed/failed
 
     Attributes:
         id: Unique identifier (UUID v4)
-        subject_id: Parent subject reference
+        user_id: Owner (for quota tracking and search)
+        workspace_id / course_id / subject_id / topic_id: Hierarchy attachment
         filename: Original file name
         file_type: File extension (pdf, docx, txt, image)
         file_path: Server-side storage path
@@ -39,12 +45,41 @@ class Document(Base):
     __tablename__ = "documents"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+
+    # Owner — required for quota tracking
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True,  # nullable for existing rows; new uploads always set this
+        index=True,
+    )
+
+    # Hierarchy attachment (at least one must be set)
+    workspace_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    course_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("courses.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     subject_id = Column(
         UUID(as_uuid=True),
         ForeignKey("subjects.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,  # Now nullable — can live at higher levels
         index=True,
     )
+    topic_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("topics.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+
     filename = Column(String(500), nullable=False)
     file_type = Column(String(20), nullable=False)  # pdf, docx, txt, image
     file_path = Column(String(1000), nullable=False)  # Storage path
@@ -57,18 +92,30 @@ class Document(Base):
     processing_error = Column(Text)
 
     # Metadata
-    language = Column(String(10), default="en")  # Detected language
+    language = Column(String(10), default="en")
     chunk_count = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    subject = relationship("Subject", back_populates="documents")
+    subject = relationship("Subject", back_populates="documents", foreign_keys=[subject_id])
+    topic = relationship("Topic", back_populates="documents", foreign_keys=[topic_id])
     chunks = relationship(
         "DocumentChunk",
         back_populates="document",
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+
+    @property
+    def attachment_level(self) -> str:
+        """Returns where in the hierarchy this document is attached."""
+        if self.topic_id:
+            return "topic"
+        if self.subject_id:
+            return "subject"
+        if self.course_id:
+            return "course"
+        return "workspace"
 
     def __repr__(self) -> str:
         return f"<Document(id={self.id}, filename={self.filename}, status={self.processing_status})>"

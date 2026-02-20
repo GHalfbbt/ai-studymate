@@ -9,8 +9,8 @@ import { NavLink } from 'react-router-dom';
 
 // Navigation items with paths, labels and icons
 const navItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: '🏠' },
-    { path: '/study', label: 'Study', icon: '💬' },
+    { path: '/workspaces', label: 'My Study Space', icon: '📚' },
+    { path: '/chat', label: 'Study Chat', icon: '💬' },
     { path: '/exams', label: 'Exams', icon: '📝' },
     { path: '/flashcards', label: 'Flashcards', icon: '🃏' },
     { path: '/voice', label: 'Voice', icon: '🎤' },

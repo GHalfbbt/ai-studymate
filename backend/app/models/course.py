@@ -7,7 +7,7 @@ Example: "Computer Science 2024" containing "Data Structures", "Algorithms", etc
 
 from uuid import uuid4
 
-from sqlalchemy import Column, String, DateTime, ForeignKey
+from sqlalchemy import Column, String, DateTime, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -41,6 +41,8 @@ class Course(Base):
         index=True,
     )
     name = Column(String(255), nullable=False)
+    color = Column(String(7), default="#3B82F6")
+    position = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships

@@ -1,14 +1,8 @@
-/**
- * Dashboard page - Main overview of workspaces, courses, and subjects.
- *
- * Provides navigation through the organization hierarchy
- * and quick access to study features. Shows uploaded documents
- * and their processing status.
- */
-
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { listDocuments } from '../api/documents';
-import type { Document } from '../types';
+import { listWorkspaces, listCourses, listSubjects } from '../api/workspaces';
+import type { Document, Workspace, Course, Subject } from '../types';
 import DropZone from '../components/Upload/DropZone';
 import Spinner from '../components/common/Spinner';
 import {
@@ -19,42 +13,154 @@ import {
 } from '../utils/formatters';
 
 export default function Dashboard() {
+    const location = useLocation();
+    const urlParams = new URLSearchParams(location.search);
+    const preselectedSubject = urlParams.get('subject') || '';
+
     const [documents, setDocuments] = useState<Document[]>([]);
+    const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+    const [courses, setCourses] = useState<Course[]>([]);
+    const [subjects, setSubjects] = useState<Subject[]>([]);
+
+    const [selectedWorkspace, setSelectedWorkspace] = useState<string>('');
+    const [selectedCourse, setSelectedCourse] = useState<string>('');
+    const [selectedSubject, setSelectedSubject] = useState<string>('');
+
     const [isLoading, setIsLoading] = useState(false);
+    const [isLoadingHierarchy, setIsLoadingHierarchy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // For MVP, we use a mock subject ID
-    // This will be replaced with real workspace/course/subject selection
-    const mockSubjectId = '00000000-0000-0000-0000-000000000001';
+    // Initial load: Fetch workspaces
+    useEffect(() => {
+        const init = async () => {
+            setIsLoadingHierarchy(true);
+            try {
+                const wsList = await listWorkspaces();
+                setWorkspaces(wsList);
+                if (wsList.length > 0) {
+                    setSelectedWorkspace(wsList[0].id);
+                }
+            } catch (err) {
+                console.error("Failed to fetch workspaces", err);
+            } finally {
+                setIsLoadingHierarchy(false);
+            }
+        };
+        init();
+    }, []);
+
+    // When workspace changes, fetch courses
+    useEffect(() => {
+        if (!selectedWorkspace) return;
+        const fetchCourses = async () => {
+            try {
+                const cList = await listCourses(selectedWorkspace);
+                setCourses(cList);
+                if (cList.length > 0) {
+                    setSelectedCourse(cList[0].id);
+                } else {
+                    setSelectedCourse('');
+                    setSubjects([]);
+                    setSelectedSubject('');
+                }
+            } catch (err) {
+                console.error("Failed to fetch courses", err);
+            }
+        };
+        fetchCourses();
+    }, [selectedWorkspace]);
+
+    // When course changes, fetch subjects
+    useEffect(() => {
+        if (!selectedWorkspace || !selectedCourse) return;
+        const fetchS = async () => {
+            try {
+                const sList = await listSubjects(selectedWorkspace, selectedCourse);
+                setSubjects(sList);
+                if (preselectedSubject && sList.some(s => s.id === preselectedSubject)) {
+                    setSelectedSubject(preselectedSubject);
+                } else if (sList.length > 0 && !selectedSubject) {
+                    setSelectedSubject(sList[0].id);
+                } else if (sList.length === 0) {
+                    setSelectedSubject('');
+                }
+            } catch (err) {
+                console.error("Failed to fetch subjects", err);
+            }
+        };
+        fetchS();
+    }, [selectedWorkspace, selectedCourse]);
 
     const fetchDocuments = async () => {
         setIsLoading(true);
         try {
-            const response = await listDocuments();
+            // Fetch all documents or filter by subject if selected
+            const response = await listDocuments(selectedSubject || undefined);
             setDocuments(response.documents);
             setError(null);
         } catch {
-            // Expected to fail until auth is set up - show empty state
             setDocuments([]);
-            setError(null);
         } finally {
             setIsLoading(false);
         }
     };
 
+    // Refetch documents when selected subject changes
     useEffect(() => {
         fetchDocuments();
-    }, []);
+    }, [selectedSubject]);
 
     return (
         <div className="max-w-7xl mx-auto space-y-8 animate-fade-in">
             {/* Page Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
                     <h1 className="text-3xl font-bold gradient-text">Dashboard</h1>
                     <p className="text-surface-200/50 mt-1">
                         Manage your study materials and track your progress
                     </p>
+                </div>
+
+                {/* Hierarchy Selectors */}
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex flex-col gap-1">
+                        <span className="text-[10px] uppercase tracking-wider text-surface-200/40 ml-1 font-semibold">Workspace</span>
+                        <select
+                            className="input !py-1.5 !px-3 text-sm min-w-[140px]"
+                            value={selectedWorkspace}
+                            onChange={(e) => setSelectedWorkspace(e.target.value)}
+                            disabled={isLoadingHierarchy}
+                        >
+                            {workspaces.map(ws => <option key={ws.id} value={ws.id}>{ws.name}</option>)}
+                            {workspaces.length === 0 && <option value="">No Workspaces</option>}
+                        </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <span className="text-[10px] uppercase tracking-wider text-surface-200/40 ml-1 font-semibold">Course</span>
+                        <select
+                            className="input !py-1.5 !px-3 text-sm min-w-[140px]"
+                            value={selectedCourse}
+                            onChange={(e) => setSelectedCourse(e.target.value)}
+                            disabled={!selectedWorkspace || courses.length === 0}
+                        >
+                            {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            {courses.length === 0 && <option value="">No Courses</option>}
+                        </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <span className="text-[10px] uppercase tracking-wider text-surface-200/40 ml-1 font-semibold">Subject</span>
+                        <select
+                            className="input !py-1.5 !px-3 text-sm min-w-[140px]"
+                            value={selectedSubject}
+                            onChange={(e) => setSelectedSubject(e.target.value)}
+                            disabled={!selectedCourse || subjects.length === 0}
+                        >
+                            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            {subjects.length === 0 && <option value="">No Subjects</option>}
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -85,11 +191,18 @@ export default function Dashboard() {
 
             {/* Upload Section */}
             <div className="card">
-                <h2 className="text-lg font-semibold text-surface-100 mb-4">
-                    📤 Upload Study Materials
-                </h2>
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-surface-100">
+                        📤 Upload Study Materials
+                    </h2>
+                    {!selectedSubject && (
+                        <span className="text-xs text-warning-400 bg-warning-400/10 px-2 py-1 rounded-md animate-pulse">
+                            Please select a subject first
+                        </span>
+                    )}
+                </div>
                 <DropZone
-                    subjectId={mockSubjectId}
+                    subjectId={selectedSubject}
                     onUploadComplete={fetchDocuments}
                 />
             </div>

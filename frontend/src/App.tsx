@@ -9,6 +9,10 @@ import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout/Layout';
 import Dashboard from './pages/Dashboard';
+import Chat from './pages/Chat';
+import Workspaces from './pages/Workspaces';
+import Exams from './pages/Exams';
+import Flashcards from './pages/Flashcards';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import { useAuthStore } from './store/authStore';
@@ -83,10 +87,11 @@ export default function App() {
     <Routes>
       {/* Authenticated routes (inside Layout with sidebar) */}
       <Route element={<RequireAuth><Layout /></RequireAuth>}>
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/study" element={<ComingSoon title="Study Chat (RAG)" />} />
-        <Route path="/exams" element={<ComingSoon title="Exam Generation" />} />
-        <Route path="/flashcards" element={<ComingSoon title="Flashcards" />} />
+        <Route path="/workspaces" element={<Workspaces />} />
+        <Route path="/dashboard" element={<Navigate to="/workspaces" replace />} />
+        <Route path="/chat" element={<Chat />} />
+        <Route path="/exams" element={<Exams />} />
+        <Route path="/flashcards" element={<Flashcards />} />
         <Route path="/voice" element={<ComingSoon title="Voice Practice" />} />
         <Route path="/analytics" element={<ComingSoon title="Analytics" />} />
         <Route path="/settings" element={<ComingSoon title="Settings" />} />

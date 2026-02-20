@@ -59,6 +59,16 @@ export interface Subject {
     color: string;
     created_at: string;
     document_count: number;
+    topic_count?: number;
+}
+
+export interface Topic {
+    id: string;
+    subject_id: string;
+    name: string;
+    position: number;
+    created_at: string;
+    document_count: number;
 }
 
 // ============================================================

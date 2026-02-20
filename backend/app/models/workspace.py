@@ -7,7 +7,7 @@ to separate different study contexts (e.g., "University", "Certification Exam").
 
 from uuid import uuid4
 
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -42,6 +42,8 @@ class Workspace(Base):
     )
     name = Column(String(255), nullable=False)
     description = Column(Text)
+    icon = Column(String(10), default="🗂️")
+    position = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships

@@ -49,34 +49,112 @@ def extract_text(file_path: str, file_type: str) -> str:
 
 def _extract_pdf(file_path: str) -> str:
     """
-    Extract text from a PDF file using PyPDF2.
+    Extract text from a PDF file.
 
-    Concatenates text from all pages with page separators.
-
-    Args:
-        file_path: Path to the PDF file
-
-    Returns:
-        str: Extracted text from all pages
+    Strategy:
+    1. Try pdfplumber (best for text-based PDFs, handles complex layouts)
+    2. Fallback to PyPDF2
+    3. Fallback to OCR via Gemini Vision for scanned/image PDFs
     """
-    from PyPDF2 import PdfReader
+    # --- Attempt 1: pdfplumber ---
+    try:
+        import pdfplumber
+        text_parts = []
+        with pdfplumber.open(file_path) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text and page_text.strip():
+                    text_parts.append(page_text.strip())
+        if text_parts:
+            return "\n\n".join(text_parts)
+    except ImportError:
+        pass
+    except Exception:
+        pass
 
-    reader = PdfReader(file_path)
-    text_parts = []
+    # --- Attempt 2: PyPDF2 ---
+    try:
+        from PyPDF2 import PdfReader
+        reader = PdfReader(file_path)
+        text_parts = []
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text and page_text.strip():
+                text_parts.append(page_text.strip())
+        if text_parts:
+            return "\n\n".join(text_parts)
+    except Exception:
+        pass
 
-    for page_num, page in enumerate(reader.pages):
-        page_text = page.extract_text()
-        if page_text:
-            text_parts.append(page_text.strip())
-
-    if not text_parts:
+    # --- Attempt 3: OCR via Gemini Vision ---
+    try:
+        return _ocr_pdf_with_gemini(file_path)
+    except Exception as e:
         raise ValueError(
-            "Could not extract text from PDF. "
-            "The file may be scanned/image-based. "
-            "Try uploading a text-based PDF."
+            f"Could not extract text from PDF. The file appears to be scanned/image-based "
+            f"and OCR also failed: {str(e)}\n"
+            f"Please ensure GEMINI_API_KEY is configured for scanned PDF support."
         )
 
-    return "\n\n".join(text_parts)
+
+def _ocr_pdf_with_gemini(file_path: str) -> str:
+    """
+    Use Gemini Vision to OCR a scanned PDF by converting pages to images.
+    Each page is sent to Gemini as an image and the text is extracted.
+    """
+    import base64
+    from app.core.config import settings
+
+    if not settings.GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY not configured for OCR")
+
+    # Convert PDF pages to images using PyPDF2 / PIL
+    try:
+        import fitz  # PyMuPDF
+        pdf_doc = fitz.open(file_path)
+    except ImportError:
+        raise ValueError("PyMuPDF not installed. Cannot convert scanned PDF to images for OCR.")
+
+    import httpx
+    import json
+
+    all_text = []
+    gemini_url = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{settings.GEMINI_MODEL}/generateContent?key={settings.GEMINI_API_KEY}"
+    )
+
+    for page_num in range(min(len(pdf_doc), 50)):  # Max 50 pages
+        page = pdf_doc[page_num]
+        # Render page as image at 150 DPI
+        mat = fitz.Matrix(150 / 72, 150 / 72)
+        clip = page.get_pixmap(matrix=mat)
+        img_bytes = clip.tobytes("png")
+        img_b64 = base64.b64encode(img_bytes).decode()
+
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"text": "Extract ALL the text from this document page. Return ONLY the extracted text, no commentary."},
+                    {"inline_data": {"mime_type": "image/png", "data": img_b64}}
+                ]
+            }]
+        }
+
+        response = httpx.post(gemini_url, json=payload, timeout=30)
+        if response.status_code == 200:
+            result = response.json()
+            page_text = result["candidates"][0]["content"]["parts"][0]["text"]
+            if page_text.strip():
+                all_text.append(f"[Page {page_num + 1}]\n{page_text.strip()}")
+
+    pdf_doc.close()
+
+    if not all_text:
+        raise ValueError("Gemini OCR returned no text from this PDF")
+    
+    print(f"  🔍 OCR completado con Gemini: {len(all_text)} páginas procesadas")
+    return "\n\n".join(all_text)
 
 
 def _extract_docx(file_path: str) -> str:

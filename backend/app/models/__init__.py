@@ -9,6 +9,7 @@ from app.models.user import User
 from app.models.workspace import Workspace
 from app.models.course import Course
 from app.models.subject import Subject
+from app.models.topic import Topic
 from app.models.document import Document, DocumentChunk
 from app.models.exam import Exam, ExamQuestion, ExamAttempt, ExamAnswer
 from app.models.flashcard import Flashcard
@@ -19,6 +20,7 @@ __all__ = [
     "Workspace",
     "Course",
     "Subject",
+    "Topic",
     "Document",
     "DocumentChunk",
     "Exam",
