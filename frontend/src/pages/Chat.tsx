@@ -21,12 +21,9 @@ export default function Chat() {
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    // Hierarchy state
-    const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-    const [courses, setCourses] = useState<Course[]>([]);
-    const [subjects, setSubjects] = useState<Subject[]>([]);
-    const [selectedWorkspace, setSelectedWorkspace] = useState('');
-    const [selectedCourse, setSelectedCourse] = useState('');
+    // Flattened subject list from all workspaces
+    interface SubjectOption { id: string; label: string; courseId: string; }
+    const [allSubjects, setAllSubjects] = useState<SubjectOption[]>([]);
     const [selectedSubject, setSelectedSubject] = useState(initialSubjectId);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -40,55 +37,35 @@ export default function Chat() {
         scrollToBottom();
     }, [messages]);
 
-    // Initial hierarchy load
+    // Load all subjects from all workspaces on mount
     useEffect(() => {
-        const init = async () => {
+        const loadAll = async () => {
             try {
                 const wsList = await listWorkspaces();
-                setWorkspaces(wsList);
-                if (wsList.length > 0) {
-                    setSelectedWorkspace(wsList[0].id);
+                const opts: SubjectOption[] = [];
+                for (const ws of wsList) {
+                    const courses = await listCourses(ws.id);
+                    for (const course of courses) {
+                        const subjects = await listSubjects(ws.id, course.id);
+                        for (const s of subjects) {
+                            opts.push({
+                                id: s.id,
+                                label: `${ws.name} → ${course.name} → ${s.name}`,
+                                courseId: course.id,
+                            });
+                        }
+                    }
                 }
-            } catch (err) {
-                console.error("Failed to load workspaces", err);
-            }
-        };
-        init();
-    }, []);
-
-    // Course load
-    useEffect(() => {
-        if (!selectedWorkspace) return;
-        const fetchC = async () => {
-            try {
-                const cList = await listCourses(selectedWorkspace);
-                setCourses(cList);
-                if (cList.length > 0 && !selectedCourse) {
-                    setSelectedCourse(cList[0].id);
-                }
-            } catch (err) {
-                console.error("Failed to load courses", err);
-            }
-        };
-        fetchC();
-    }, [selectedWorkspace]);
-
-    // Subject load
-    useEffect(() => {
-        if (!selectedWorkspace || !selectedCourse) return;
-        const fetchS = async () => {
-            try {
-                const sList = await listSubjects(selectedWorkspace, selectedCourse);
-                setSubjects(sList);
-                if (sList.length > 0 && !selectedSubject) {
-                    setSelectedSubject(initialSubjectId || sList[0].id);
+                setAllSubjects(opts);
+                if (!selectedSubject && opts.length > 0) {
+                    setSelectedSubject(initialSubjectId || opts[0].id);
                 }
             } catch (err) {
                 console.error("Failed to load subjects", err);
             }
         };
-        fetchS();
-    }, [selectedWorkspace, selectedCourse]);
+        loadAll();
+    }, []);
 
     const handleSendMessage = async (e?: React.FormEvent) => {
         e?.preventDefault();
@@ -146,22 +123,15 @@ export default function Chat() {
 
                 <div className="flex items-center gap-2">
                     <select
-                        className="input !py-1 !px-2 text-xs min-w-[150px]"
+                        className="input !py-1 !px-2 text-xs min-w-[200px]"
                         value={selectedSubject}
                         onChange={(e) => setSelectedSubject(e.target.value)}
                     >
-                        <option value="">Full Knowledge Base</option>
-                        {courses.map(course => (
-                            <optgroup key={course.id} label={course.name}>
-                                {subjects
-                                    .filter(s => s.course_id === course.id)
-                                    .map(s => (
-                                        <option key={s.id} value={s.id}>
-                                            {s.name}
-                                        </option>
-                                    ))
-                                }
-                            </optgroup>
+                        <option value="">🌐 Full Knowledge Base</option>
+                        {allSubjects.map(s => (
+                            <option key={s.id} value={s.id}>
+                                📝 {s.label}
+                            </option>
                         ))}
                     </select>
                 </div>
