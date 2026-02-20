@@ -1,7 +1,7 @@
 """
 Text extraction utilities for different file formats.
 
-Supports PDF, DOCX, TXT, and image files.
+Supports PDF, DOCX, ODT, TXT, and image files.
 Each extractor returns plain text content from the file.
 """
 
@@ -33,6 +33,7 @@ def extract_text(file_path: str, file_type: str) -> str:
     extractors = {
         "pdf": _extract_pdf,
         "docx": _extract_docx,
+        "odt": _extract_odt,
         "txt": _extract_txt,
         "image": _extract_image,
     }
@@ -190,6 +191,43 @@ def _extract_docx(file_path: str) -> str:
 
     if not text_parts:
         raise ValueError("Could not extract text from DOCX. The file may be empty.")
+
+    return "\n\n".join(text_parts)
+
+
+def _extract_odt(file_path: str) -> str:
+    """
+    Extract text from an ODT (OpenDocument Text) file using odfpy.
+
+    ODT files are ZIP archives containing XML. The odf library
+    parses the content.xml and extracts all text elements.
+
+    Args:
+        file_path: Path to the ODT file
+
+    Returns:
+        str: Extracted text from the ODT document
+    """
+    from odf.opendocument import load
+    from odf.text import P, H, Span
+    from odf import teletype
+
+    doc = load(file_path)
+    text_parts = []
+
+    # Extract text from all paragraph and heading elements
+    for element in doc.getElementsByType(P):
+        text = teletype.extractText(element)
+        if text and text.strip():
+            text_parts.append(text.strip())
+
+    for element in doc.getElementsByType(H):
+        text = teletype.extractText(element)
+        if text and text.strip():
+            text_parts.append(text.strip())
+
+    if not text_parts:
+        raise ValueError("Could not extract text from ODT. The file may be empty.")
 
     return "\n\n".join(text_parts)
 

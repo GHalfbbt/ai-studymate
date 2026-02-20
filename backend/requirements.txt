@@ -30,6 +30,7 @@ pypdf2==3.0.1
 pdfplumber==0.10.4
 pymupdf==1.24.14
 python-docx==1.1.0
+odfpy==1.4.1
 Pillow==10.2.0
 
 # --- Voice Services (TTS only for now - STT added in Day 4) ---

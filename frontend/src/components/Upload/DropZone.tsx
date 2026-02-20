@@ -22,6 +22,7 @@ interface DropZoneProps {
 const ACCEPTED_TYPES = {
     'application/pdf': ['.pdf'],
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+    'application/vnd.oasis.opendocument.text': ['.odt'],
     'text/plain': ['.txt'],
     'image/png': ['.png'],
     'image/jpeg': ['.jpg', '.jpeg'],
@@ -110,6 +111,7 @@ export default function DropZone({ subjectId, onUploadComplete }: DropZoneProps)
                         <div className="flex items-center gap-4 mt-2 text-xs text-surface-200/30">
                             <span>📄 PDF</span>
                             <span>📝 DOCX</span>
+                            <span>📋 ODT</span>
                             <span>📃 TXT</span>
                             <span>🖼️ Images</span>
                             <span>• Max {formatFileSize(MAX_SIZE)}</span>

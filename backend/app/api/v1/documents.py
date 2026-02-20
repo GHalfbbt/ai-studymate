@@ -32,7 +32,7 @@ storage_service = StorageService()
 )
 async def upload_document(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(..., description="Document file (PDF, DOCX, TXT, or image)"),
+    file: UploadFile = File(..., description="Document file (PDF, DOCX, ODT, TXT, or image)"),
     workspace_id: Optional[UUID] = Form(None, description="Workspace to attach to"),
     course_id: Optional[UUID] = Form(None, description="Course to attach to"),
     subject_id: Optional[UUID] = Form(None, description="Subject to attach to"),
@@ -309,6 +309,7 @@ async def download_document(
             media_types = {
                 "pdf": "application/pdf",
                 "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "odt": "application/vnd.oasis.opendocument.text",
                 "txt": "text/plain; charset=utf-8",
                 "image": "image/jpeg",
             }
@@ -330,6 +331,7 @@ async def download_document(
     media_types = {
         "pdf": "application/pdf",
         "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "odt": "application/vnd.oasis.opendocument.text",
         "txt": "text/plain",
         "image": "image/jpeg",
     }

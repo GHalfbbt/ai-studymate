@@ -39,7 +39,7 @@ class StorageService:
     """
 
     # Allowed file extensions for upload
-    ALLOWED_EXTENSIONS = {"pdf", "docx", "txt", "png", "jpg", "jpeg"}
+    ALLOWED_EXTENSIONS = {"pdf", "docx", "odt", "txt", "png", "jpg", "jpeg"}
 
     # Maximum file size (from settings, default 10MB)
     MAX_FILE_SIZE = settings.MAX_UPLOAD_SIZE
@@ -300,6 +300,7 @@ class StorageService:
         content_types = {
             "pdf": "application/pdf",
             "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "odt": "application/vnd.oasis.opendocument.text",
             "txt": "text/plain",
             "png": "image/png",
             "jpg": "image/jpeg",

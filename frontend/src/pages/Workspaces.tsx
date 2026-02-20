@@ -124,24 +124,50 @@ export default function Workspaces() {
 
     useEffect(() => { loadDocs(); }, [loadDocs]);
 
+    // ── Upload state for error feedback ────────────────
+    const [uploadError, setUploadError] = useState<string | null>(null);
+
     // ── Upload handler ─────────────────────────────────
+    const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.odt', '.txt', '.png', '.jpg', '.jpeg'];
+
     const handleUpload = async (files: FileList) => {
         if (!selWs) return;
         setUploading(true);
+        setUploadError(null);
         const target: Record<string, string> = { workspace_id: selWs.id };
         if (selCourse) target.course_id = selCourse.id;
         if (selSubject) target.subject_id = selSubject.id;
         if (selTopic) target.topic_id = selTopic.id;
 
+        const rejected: string[] = [];
+        const accepted: File[] = [];
+
         for (const file of Array.from(files)) {
+            const ext = file.name.includes('.') ? '.' + file.name.split('.').pop()!.toLowerCase() : '';
+            if (!ALLOWED_EXTENSIONS.includes(ext)) {
+                rejected.push(file.name);
+            } else {
+                accepted.push(file);
+            }
+        }
+
+        if (rejected.length > 0) {
+            setUploadError(
+                `Unsupported file type: ${rejected.join(', ')}. Allowed: ${ALLOWED_EXTENSIONS.join(', ')}`
+            );
+        }
+
+        for (const file of accepted) {
             try {
                 await uploadDocument(file, target);
-            } catch (err) {
+            } catch (err: unknown) {
+                const msg = err instanceof Error ? err.message : 'Upload failed';
+                setUploadError(prev => prev ? `${prev}\n❌ ${file.name}: ${msg}` : `❌ ${file.name}: ${msg}`);
                 console.error('Upload failed:', err);
             }
         }
         setUploading(false);
-        loadDocs();
+        if (accepted.length > 0) loadDocs();
     };
 
     // ── Delete document ────────────────────────────────
@@ -339,7 +365,7 @@ export default function Workspaces() {
                                     💬 Chat with these docs
                                 </button>
                             )}
-                            <input ref={fileRef} type="file" className="hidden" multiple accept=".pdf,.docx,.txt,.png,.jpg,.jpeg"
+                            <input ref={fileRef} type="file" className="hidden" multiple accept=".pdf,.docx,.odt,.txt,.png,.jpg,.jpeg"
                                 onChange={e => e.target.files && handleUpload(e.target.files)} />
                             <button
                                 className="btn-primary text-xs"
@@ -351,16 +377,29 @@ export default function Workspaces() {
                         </div>
                     </div>
 
+                    {/* Upload error feedback */}
+                    {uploadError && (
+                        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                            <div className="flex items-start justify-between">
+                                <div className="whitespace-pre-line">⚠️ {uploadError}</div>
+                                <button onClick={() => setUploadError(null)} className="text-red-400/60 hover:text-red-400 ml-2 text-xs">✕</button>
+                            </div>
+                        </div>
+                    )}
+
                     {docs.length === 0 ? (
                         <div className="text-center py-10 text-surface-200/30 text-sm">
                             No documents at this level. Click "Upload files here" to add study materials.
+                            <div className="mt-2 text-xs text-surface-200/20">
+                                Supported formats: PDF, DOCX, ODT, TXT, PNG, JPG
+                            </div>
                         </div>
                     ) : (
                         <div className="space-y-2">
                             {docs.map(doc => (
                                 <div key={doc.id} className="flex items-center justify-between bg-surface-900/40 rounded-lg px-4 py-3 border border-surface-700/20">
                                     <div className="flex items-center gap-3 min-w-0">
-                                        <span className="text-lg">{doc.file_type === 'pdf' ? '📕' : doc.file_type === 'docx' ? '📘' : '📄'}</span>
+                                        <span className="text-lg">{doc.file_type === 'pdf' ? '📕' : doc.file_type === 'docx' ? '📘' : doc.file_type === 'odt' ? '📗' : '📄'}</span>
                                         <div className="min-w-0">
                                             <a
                                                 href={getDocumentDownloadUrl(doc.id)}

@@ -15,13 +15,14 @@ from app.core.config import settings
 ALLOWED_MIME_TYPES = {
     "application/pdf": "pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/vnd.oasis.opendocument.text": "odt",
     "text/plain": "txt",
     "image/png": "image",
     "image/jpeg": "image",
 }
 
 # Allowed file extensions
-ALLOWED_EXTENSIONS: Set[str] = {"pdf", "docx", "txt", "png", "jpg", "jpeg"}
+ALLOWED_EXTENSIONS: Set[str] = {"pdf", "docx", "odt", "txt", "png", "jpg", "jpeg"}
 
 
 def validate_file_extension(filename: str) -> str:
