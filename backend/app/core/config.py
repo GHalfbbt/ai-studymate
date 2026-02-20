@@ -59,11 +59,16 @@ class Settings(BaseSettings):
     SPEECHMATICS_API_KEY: Optional[str] = None
     STT_PROVIDER: str = "speechmatics"  # speechmatics, whisper
 
+    # --- Supabase Storage (optional, for production file storage) ---
+    SUPABASE_SERVICE_KEY: Optional[str] = None
+    SUPABASE_BUCKET: Optional[str] = None
+
     class Config:
         """Pydantic settings configuration."""
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = True
+        extra = "ignore"
 
 
 # Singleton settings instance
