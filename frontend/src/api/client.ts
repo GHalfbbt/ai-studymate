@@ -48,10 +48,9 @@ apiClient.interceptors.response.use(
         if (error.response?.status === 401) {
             // Token expired or invalid - clear auth state
             localStorage.removeItem('access_token');
-            // TODO (Day 2): Redirect to login once auth pages are implemented
-            // if (window.location.pathname !== '/login') {
-            //     window.location.href = '/login';
-            // }
+            if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }

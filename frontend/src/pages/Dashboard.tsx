@@ -95,7 +95,11 @@ export default function Dashboard() {
         setIsLoading(true);
         try {
             // Fetch all documents or filter by subject if selected
-            const response = await listDocuments(selectedSubject || undefined);
+            const filters: Record<string, string> = {};
+            if (selectedSubject) filters.subject_id = selectedSubject;
+            else if (selectedCourse) filters.course_id = selectedCourse;
+            else if (selectedWorkspace) filters.workspace_id = selectedWorkspace;
+            const response = await listDocuments(Object.keys(filters).length > 0 ? filters : undefined);
             setDocuments(response.documents);
             setError(null);
         } catch {

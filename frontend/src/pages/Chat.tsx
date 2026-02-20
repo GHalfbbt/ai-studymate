@@ -88,11 +88,21 @@ export default function Chat() {
                 subject_id: selectedSubject || undefined,
             });
 
+            // Map backend RAGSource format to frontend ChatMessage source format
+            const mappedSources = response.sources?.map((s: any, idx: number) => ({
+                source_number: idx + 1,
+                document_id: null,
+                filename: s.document_name || s.filename || null,
+                chunk_index: s.chunk_index ?? null,
+                relevance_score: s.relevance_score ?? 0,
+                excerpt: s.content || s.excerpt || '',
+            }));
+
             const assistantMessage: ChatMessage = {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
                 content: response.answer,
-                sources: response.sources,
+                sources: mappedSources,
                 confidence: response.confidence,
                 timestamp: new Date(),
             };

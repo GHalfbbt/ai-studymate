@@ -46,7 +46,7 @@ class ExamQuestionResponse(BaseModel):
 class ExamResponse(BaseModel):
     """Schema for exam response (without answers)."""
     id: UUID
-    subject_id: UUID
+    subject_id: Optional[UUID] = None
     title: str
     description: Optional[str]
     question_count: int

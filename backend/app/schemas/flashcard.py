@@ -25,7 +25,7 @@ class FlashcardGenerate(BaseModel):
 class FlashcardResponse(BaseModel):
     """Schema for flashcard response."""
     id: UUID
-    subject_id: UUID
+    subject_id: Optional[UUID] = None
     document_id: Optional[UUID]
     front: str
     back: str

@@ -74,7 +74,7 @@ def generate_flashcards(
 
 @router.get("/", response_model=FlashcardListResponse)
 def list_flashcards(
-    subject_id: UUID,
+    subject_id: Optional[UUID] = None,
     due_only: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -90,8 +90,20 @@ def list_flashcards(
         FlashcardListResponse with flashcards and total count
     """
     from datetime import datetime
+    from app.models.subject import Subject
+    from app.models.course import Course
+    from app.models.workspace import Workspace
 
-    query = db.query(Flashcard).filter(Flashcard.subject_id == subject_id)
+    query = db.query(Flashcard)
+
+    if subject_id:
+        query = query.filter(Flashcard.subject_id == subject_id)
+
+    # Filter by user ownership: only flashcards whose subject belongs to user's workspace
+    user_workspace_ids = [w.id for w in db.query(Workspace).filter(Workspace.user_id == current_user.id).all()]
+    user_course_ids = [c.id for c in db.query(Course).filter(Course.workspace_id.in_(user_workspace_ids)).all()]
+    user_subject_ids = [s.id for s in db.query(Subject).filter(Subject.course_id.in_(user_course_ids)).all()]
+    query = query.filter(Flashcard.subject_id.in_(user_subject_ids))
 
     if due_only:
         now = datetime.utcnow()

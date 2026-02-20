@@ -9,18 +9,17 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt as _bcrypt
 
 from app.core.config import settings
-
-# Password hashing context using bcrypt algorithm
-# bcrypt is the recommended algorithm for password storage
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
     """
     Hash a plaintext password using bcrypt.
+
+    Uses bcrypt directly (instead of passlib) for compatibility
+    with bcrypt >= 4.1 which enforces the 72-byte limit strictly.
 
     Args:
         password: Plaintext password to hash
@@ -28,7 +27,11 @@ def hash_password(password: str) -> str:
     Returns:
         Hashed password string safe for database storage
     """
-    return pwd_context.hash(password)
+    # bcrypt requires bytes; truncate to 72 bytes (bcrypt limit)
+    pwd_bytes = password.encode("utf-8")[:72]
+    salt = _bcrypt.gensalt()
+    hashed = _bcrypt.hashpw(pwd_bytes, salt)
+    return hashed.decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -42,7 +45,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Returns:
         True if password matches, False otherwise
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    pwd_bytes = plain_password.encode("utf-8")[:72]
+    hashed_bytes = hashed_password.encode("utf-8")
+    return _bcrypt.checkpw(pwd_bytes, hashed_bytes)
 
 
 def create_access_token(

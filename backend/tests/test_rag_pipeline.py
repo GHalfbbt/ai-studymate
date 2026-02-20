@@ -11,8 +11,10 @@ Tests cover:
 - Metadata validation in vector store
 """
 
+import gc
 import os
 import uuid
+import shutil
 import tempfile
 import pytest
 from unittest.mock import patch, MagicMock
@@ -22,6 +24,25 @@ from sqlalchemy.orm import Session
 from app.models.document import Document, DocumentChunk
 
 
+def safe_cleanup_chroma(tmpdir, store=None):
+    """Safely clean up ChromaDB temp directory on Windows.
+    
+    ChromaDB keeps file handles open, so we need to delete the client
+    and force garbage collection before removing the directory.
+    """
+    if store is not None:
+        try:
+            del store.collection
+            del store.client
+        except Exception:
+            pass
+    gc.collect()
+    try:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+    except Exception:
+        pass
+
+
 class TestVectorStore:
     """Phase 4 — Vector database validation."""
 
@@ -29,8 +50,9 @@ class TestVectorStore:
         """Add a document to vector store and query it back."""
         from app.services.vector_store import VectorStore
 
-        # Use a temporary directory for ChromaDB
-        with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir = tempfile.mkdtemp()
+        store = None
+        try:
             store = VectorStore(persist_directory=tmpdir)
 
             # Add a test document chunk
@@ -56,12 +78,16 @@ class TestVectorStore:
 
             # Verify collection count increased
             assert store.get_collection_count() >= 1
+        finally:
+            safe_cleanup_chroma(tmpdir, store)
 
     def test_query_returns_relevant_results(self, mock_embedder):
         """Query should return the most relevant chunks."""
         from app.services.vector_store import VectorStore
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir = tempfile.mkdtemp()
+        store = None
+        try:
             store = VectorStore(persist_directory=tmpdir)
             user_id = str(uuid.uuid4())
             doc_id = str(uuid.uuid4())
@@ -102,12 +128,16 @@ class TestVectorStore:
             assert len(results["documents"][0]) == 3
             assert len(results["metadatas"][0]) == 3
             assert len(results["distances"][0]) == 3
+        finally:
+            safe_cleanup_chroma(tmpdir, store)
 
     def test_delete_by_document(self, mock_embedder):
         """Deleting by document_id should remove all related chunks."""
         from app.services.vector_store import VectorStore
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir = tempfile.mkdtemp()
+        store = None
+        try:
             store = VectorStore(persist_directory=tmpdir)
             doc_id = str(uuid.uuid4())
 
@@ -136,12 +166,16 @@ class TestVectorStore:
 
             final_count = store.get_collection_count()
             assert final_count == 0
+        finally:
+            safe_cleanup_chroma(tmpdir, store)
 
     def test_metadata_contains_required_fields(self, mock_embedder):
         """Stored metadata must contain user_id, document_id, subject_id, chunk_index."""
         from app.services.vector_store import VectorStore
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir = tempfile.mkdtemp()
+        store = None
+        try:
             store = VectorStore(persist_directory=tmpdir)
 
             chunk_id = str(uuid.uuid4())
@@ -176,12 +210,16 @@ class TestVectorStore:
             assert meta["subject_id"] == subject_id
             assert meta["chunk_index"] == 0
             assert meta["filename"] == "meta_test.txt"
+        finally:
+            safe_cleanup_chroma(tmpdir, store)
 
     def test_filtered_query_by_user(self, mock_embedder):
         """Query with user_id filter should only return that user's chunks."""
         from app.services.vector_store import VectorStore
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir = tempfile.mkdtemp()
+        store = None
+        try:
             store = VectorStore(persist_directory=tmpdir)
 
             user_a = str(uuid.uuid4())
@@ -229,11 +267,17 @@ class TestVectorStore:
             # Should only get user A's chunk
             assert len(results["documents"][0]) == 1
             assert results["metadatas"][0][0]["user_id"] == user_a
+        finally:
+            safe_cleanup_chroma(tmpdir, store)
 
 
 class TestIngestionPipeline:
     """Phase 2/3 — Full ingestion pipeline with mocked embedder."""
 
+    @pytest.mark.skipif(
+        not os.environ.get("RUN_HEAVY_TESTS"),
+        reason="Requires sentence_transformers (heavy dependency, run in Docker)",
+    )
     def test_ingest_txt_document(
         self, db: Session, mock_embedder, test_pdf_content,
     ):
@@ -268,50 +312,56 @@ class TestIngestionPipeline:
             f.write(test_pdf_content)
             file_path = f.name
 
+        chroma_dir = tempfile.mkdtemp()
+        vector_store = None
         try:
-            with tempfile.TemporaryDirectory() as chroma_dir:
-                vector_store = VectorStore(persist_directory=chroma_dir)
-                ingestor = IngestorService(db, mock_embedder, vector_store)
+            vector_store = VectorStore(persist_directory=chroma_dir)
+            ingestor = IngestorService(db, mock_embedder, vector_store)
 
-                import asyncio
-                loop = asyncio.new_event_loop()
-                document = loop.run_until_complete(
-                    ingestor.ingest_document(
-                        file_path=file_path,
-                        filename="mars_capital.txt",
-                        file_type="txt",
-                        subject_id=subject.id,
-                        user_id=user.id,
-                    )
+            import asyncio
+            loop = asyncio.new_event_loop()
+            document = loop.run_until_complete(
+                ingestor.ingest_document(
+                    file_path=file_path,
+                    filename="mars_capital.txt",
+                    file_type="txt",
+                    subject_id=subject.id,
+                    user_id=user.id,
                 )
-                loop.close()
+            )
+            loop.close()
 
-                # Verify document record
-                assert document.processing_status == "completed"
-                assert document.chunk_count > 0
-                assert document.filename == "mars_capital.txt"
+            # Verify document record
+            assert document.processing_status == "completed"
+            assert document.chunk_count > 0
+            assert document.filename == "mars_capital.txt"
 
-                # Verify chunks in database
-                chunks = db.query(DocumentChunk).filter(
-                    DocumentChunk.document_id == document.id
-                ).all()
-                assert len(chunks) > 0
-                assert len(chunks) == document.chunk_count
+            # Verify chunks in database
+            chunks = db.query(DocumentChunk).filter(
+                DocumentChunk.document_id == document.id
+            ).all()
+            assert len(chunks) > 0
+            assert len(chunks) == document.chunk_count
 
-                # Verify each chunk has content and vector_id
-                for chunk in chunks:
-                    assert chunk.content is not None
-                    assert len(chunk.content) > 0
-                    assert chunk.vector_id is not None
-                    assert chunk.chunk_index >= 0
+            # Verify each chunk has content and vector_id
+            for chunk in chunks:
+                assert chunk.content is not None
+                assert len(chunk.content) > 0
+                assert chunk.vector_id is not None
+                assert chunk.chunk_index >= 0
 
-                # Verify embeddings in vector store match chunk count
-                vector_count = vector_store.get_collection_count()
-                assert vector_count == len(chunks)
+            # Verify embeddings in vector store match chunk count
+            vector_count = vector_store.get_collection_count()
+            assert vector_count == len(chunks)
 
         finally:
             os.unlink(file_path)
+            safe_cleanup_chroma(chroma_dir, vector_store)
 
+    @pytest.mark.skipif(
+        not os.environ.get("RUN_HEAVY_TESTS"),
+        reason="Requires sentence_transformers (heavy dependency, run in Docker)",
+    )
     def test_ingest_with_existing_document_id(
         self, db: Session, mock_embedder, test_pdf_content,
     ):
@@ -361,38 +411,44 @@ class TestIngestionPipeline:
             f.write(test_pdf_content)
             file_path = f.name
 
+        chroma_dir = tempfile.mkdtemp()
+        vector_store = None
         try:
-            with tempfile.TemporaryDirectory() as chroma_dir:
-                vector_store = VectorStore(persist_directory=chroma_dir)
-                ingestor = IngestorService(db, mock_embedder, vector_store)
+            vector_store = VectorStore(persist_directory=chroma_dir)
+            ingestor = IngestorService(db, mock_embedder, vector_store)
 
-                import asyncio
-                loop = asyncio.new_event_loop()
-                document = loop.run_until_complete(
-                    ingestor.ingest_document(
-                        file_path=file_path,
-                        filename="existing.txt",
-                        file_type="txt",
-                        subject_id=subject.id,
-                        user_id=user.id,
-                        document_id=existing_doc.id,  # Pass existing ID
-                    )
+            import asyncio
+            loop = asyncio.new_event_loop()
+            document = loop.run_until_complete(
+                ingestor.ingest_document(
+                    file_path=file_path,
+                    filename="existing.txt",
+                    file_type="txt",
+                    subject_id=subject.id,
+                    user_id=user.id,
+                    document_id=existing_doc.id,  # Pass existing ID
                 )
-                loop.close()
+            )
+            loop.close()
 
-                # Should have updated the existing document, not created a new one
-                assert document.id == existing_doc.id
-                assert document.processing_status == "completed"
+            # Should have updated the existing document, not created a new one
+            assert document.id == existing_doc.id
+            assert document.processing_status == "completed"
 
-                # Count total documents — should be exactly 1
-                total_docs = db.query(Document).filter(
-                    Document.user_id == user.id
-                ).count()
-                assert total_docs == 1
+            # Count total documents — should be exactly 1
+            total_docs = db.query(Document).filter(
+                Document.user_id == user.id
+            ).count()
+            assert total_docs == 1
 
         finally:
             os.unlink(file_path)
+            safe_cleanup_chroma(chroma_dir, vector_store)
 
+    @pytest.mark.skipif(
+        not os.environ.get("RUN_HEAVY_TESTS"),
+        reason="Requires sentence_transformers (heavy dependency, run in Docker)",
+    )
     def test_ingest_short_text_fails(self, db: Session, mock_embedder):
         """Ingestion of very short text should fail with meaningful error."""
         from app.services.vector_store import VectorStore
@@ -424,26 +480,28 @@ class TestIngestionPipeline:
             f.write("Too short.")
             file_path = f.name
 
+        chroma_dir = tempfile.mkdtemp()
+        vector_store = None
         try:
-            with tempfile.TemporaryDirectory() as chroma_dir:
-                vector_store = VectorStore(persist_directory=chroma_dir)
-                ingestor = IngestorService(db, mock_embedder, vector_store)
+            vector_store = VectorStore(persist_directory=chroma_dir)
+            ingestor = IngestorService(db, mock_embedder, vector_store)
 
-                import asyncio
-                loop = asyncio.new_event_loop()
-                with pytest.raises(ValueError, match="too short"):
-                    loop.run_until_complete(
-                        ingestor.ingest_document(
-                            file_path=file_path,
-                            filename="short.txt",
-                            file_type="txt",
-                            subject_id=subject.id,
-                            user_id=user.id,
-                        )
+            import asyncio
+            loop = asyncio.new_event_loop()
+            with pytest.raises(ValueError, match="too short"):
+                loop.run_until_complete(
+                    ingestor.ingest_document(
+                        file_path=file_path,
+                        filename="short.txt",
+                        file_type="txt",
+                        subject_id=subject.id,
+                        user_id=user.id,
                     )
-                loop.close()
+                )
+            loop.close()
         finally:
             os.unlink(file_path)
+            safe_cleanup_chroma(chroma_dir, vector_store)
 
 
 class TestRAGEndpoint:
@@ -457,7 +515,9 @@ class TestRAGEndpoint:
         """RAG query should return answer with sources when context exists."""
         from app.services.vector_store import VectorStore
 
-        with tempfile.TemporaryDirectory() as chroma_dir:
+        chroma_dir = tempfile.mkdtemp()
+        vector_store = None
+        try:
             vector_store = VectorStore(persist_directory=chroma_dir)
 
             # Add test chunks to vector store
@@ -506,6 +566,8 @@ class TestRAGEndpoint:
                 assert "document_name" in source
                 assert "relevance_score" in source
                 assert source["document_name"] == "mars.txt"
+        finally:
+            safe_cleanup_chroma(chroma_dir, vector_store)
 
     def test_rag_query_no_context(
         self, client: TestClient, auth_headers: dict,
@@ -514,7 +576,9 @@ class TestRAGEndpoint:
         """RAG query with no matching documents should return safe fallback."""
         from app.services.vector_store import VectorStore
 
-        with tempfile.TemporaryDirectory() as chroma_dir:
+        chroma_dir = tempfile.mkdtemp()
+        vector_store = None
+        try:
             vector_store = VectorStore(persist_directory=chroma_dir)
             # Empty vector store — no documents
 
@@ -537,6 +601,8 @@ class TestRAGEndpoint:
                 assert data["sources"] == []
                 # Should indicate no relevant info found
                 assert "no" in data["answer"].lower() or "encontrado" in data["answer"].lower()
+        finally:
+            safe_cleanup_chroma(chroma_dir, vector_store)
 
     def test_rag_query_requires_auth(self, client: TestClient):
         """RAG query without authentication should return 401."""
@@ -573,6 +639,10 @@ class TestRAGEndpoint:
 class TestEmbeddingChunkConsistency:
     """Phase 4 — Verify embedding count matches chunk count."""
 
+    @pytest.mark.skipif(
+        not os.environ.get("RUN_HEAVY_TESTS"),
+        reason="Requires sentence_transformers (heavy dependency, run in Docker)",
+    )
     def test_embedding_count_equals_chunk_count(
         self, db: Session, mock_embedder, test_pdf_content,
     ):
@@ -605,36 +675,38 @@ class TestEmbeddingChunkConsistency:
             f.write(test_pdf_content)
             file_path = f.name
 
+        chroma_dir = tempfile.mkdtemp()
+        vector_store = None
         try:
-            with tempfile.TemporaryDirectory() as chroma_dir:
-                vector_store = VectorStore(persist_directory=chroma_dir)
-                ingestor = IngestorService(db, mock_embedder, vector_store)
+            vector_store = VectorStore(persist_directory=chroma_dir)
+            ingestor = IngestorService(db, mock_embedder, vector_store)
 
-                import asyncio
-                loop = asyncio.new_event_loop()
-                document = loop.run_until_complete(
-                    ingestor.ingest_document(
-                        file_path=file_path,
-                        filename="count_test.txt",
-                        file_type="txt",
-                        subject_id=subject.id,
-                        user_id=user.id,
-                    )
+            import asyncio
+            loop = asyncio.new_event_loop()
+            document = loop.run_until_complete(
+                ingestor.ingest_document(
+                    file_path=file_path,
+                    filename="count_test.txt",
+                    file_type="txt",
+                    subject_id=subject.id,
+                    user_id=user.id,
                 )
-                loop.close()
+            )
+            loop.close()
 
-                # Count chunks in DB
-                db_chunk_count = db.query(DocumentChunk).filter(
-                    DocumentChunk.document_id == document.id
-                ).count()
+            # Count chunks in DB
+            db_chunk_count = db.query(DocumentChunk).filter(
+                DocumentChunk.document_id == document.id
+            ).count()
 
-                # Count embeddings in vector store
-                vector_count = vector_store.get_collection_count()
+            # Count embeddings in vector store
+            vector_count = vector_store.get_collection_count()
 
-                # They must match
-                assert db_chunk_count == vector_count
-                assert db_chunk_count == document.chunk_count
-                assert db_chunk_count > 0
+            # They must match
+            assert db_chunk_count == vector_count
+            assert db_chunk_count == document.chunk_count
+            assert db_chunk_count > 0
 
         finally:
             os.unlink(file_path)
+            safe_cleanup_chroma(chroma_dir, vector_store)

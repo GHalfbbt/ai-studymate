@@ -46,7 +46,7 @@ export default function DropZone({ subjectId, onUploadComplete }: DropZoneProps)
             try {
                 // Upload files sequentially
                 for (const file of acceptedFiles) {
-                    await uploadDocument(file, subjectId);
+                    await uploadDocument(file, { subject_id: subjectId });
                 }
 
                 const fileNames = acceptedFiles.map((f) => f.name).join(', ');
