@@ -106,12 +106,18 @@ async def upload_document(
     if not workspace:
         raise HTTPException(status_code=403, detail="You don't have permission to upload here")
 
-    # Save file to storage
+    # Save file to storage (local + Supabase if configured)
     storage_key = subject_id or course_id or workspace_id
     try:
-        file_info = await storage_service.save_file(file, storage_key)
+        file_info = await storage_service.save_file(
+            file, storage_key, user_id=current_user.id
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    # Use Supabase storage_key as file_path if cloud upload succeeded,
+    # otherwise keep the local path for backward compatibility
+    persisted_path = file_info.get("storage_key", file_info["file_path"])
 
     # Create document record
     document = Document(
@@ -122,7 +128,7 @@ async def upload_document(
         topic_id=topic_id,
         filename=file_info["filename"],
         file_type=file_info["file_type"],
-        file_path=file_info["file_path"],
+        file_path=persisted_path,
         file_size=file_info["file_size"],
         processing_status="pending",
     )
@@ -274,8 +280,13 @@ async def download_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Download the original uploaded file for viewing or saving."""
-    from fastapi.responses import FileResponse
+    """
+    Download the original uploaded file for viewing or saving.
+
+    For Supabase-stored files, redirects to a signed URL (1 hour expiry).
+    For local files, serves the file directly via FileResponse.
+    """
+    from fastapi.responses import FileResponse, RedirectResponse
     import os
 
     document = db.query(Document).filter(
@@ -286,6 +297,32 @@ async def download_document(
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    # If file is stored in Supabase, generate a signed URL and redirect
+    if document.file_path and document.file_path.startswith("supabase://"):
+        signed_url = await storage_service.get_download_url(document.file_path)
+        if signed_url:
+            return RedirectResponse(url=signed_url, status_code=302)
+        # Fallback: try to download from Supabase and stream it
+        content = await storage_service.download_file(document.file_path)
+        if content:
+            from fastapi.responses import Response
+            media_types = {
+                "pdf": "application/pdf",
+                "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "txt": "text/plain; charset=utf-8",
+                "image": "image/jpeg",
+            }
+            media_type = media_types.get(document.file_type, "application/octet-stream")
+            return Response(
+                content=content,
+                media_type=media_type,
+                headers={
+                    "Content-Disposition": f'inline; filename="{document.filename}"',
+                },
+            )
+        raise HTTPException(status_code=404, detail="File not found in cloud storage")
+
+    # Local file path
     if not document.file_path or not os.path.exists(document.file_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
 

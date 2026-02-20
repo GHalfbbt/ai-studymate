@@ -60,8 +60,14 @@ class Settings(BaseSettings):
     STT_PROVIDER: str = "speechmatics"  # speechmatics, whisper
 
     # --- Supabase Storage (optional, for production file storage) ---
+    SUPABASE_URL: Optional[str] = None  # e.g. https://<project-ref>.supabase.co
     SUPABASE_SERVICE_KEY: Optional[str] = None
     SUPABASE_BUCKET: Optional[str] = None
+
+    @property
+    def supabase_storage_enabled(self) -> bool:
+        """Check if Supabase Storage is configured and ready to use."""
+        return bool(self.SUPABASE_SERVICE_KEY and self.SUPABASE_BUCKET and self.SUPABASE_URL)
 
     class Config:
         """Pydantic settings configuration."""
