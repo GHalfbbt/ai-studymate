@@ -17,7 +17,8 @@ from app.core.security import decode_access_token
 from app.models.user import User
 
 # OAuth2 scheme for JWT token extraction from Authorization header
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+# Points to the /token endpoint which accepts OAuth2 form data (Swagger-compatible)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 
 
 def get_current_user(

@@ -108,13 +108,13 @@
 
 html {
   scroll-behavior: smooth;
-  font-size: 16px;
+  font-size: 17px;
 }
 
 body {
   font-family: var(--font-sans);
   background-color: var(--color-surface-950);
-  color: var(--color-surface-100);
+  color: var(--color-surface-50);
   min-height: 100vh;
   font-size: 1rem;
   line-height: 1.6;

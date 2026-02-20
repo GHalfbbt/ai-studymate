@@ -71,9 +71,14 @@ class IngestorService:
         file_type: str,
         subject_id: UUID,
         user_id: UUID,
+        document_id: UUID = None,
     ) -> Document:
         """
         Process and ingest a single document through the full pipeline.
+
+        If document_id is provided, updates the existing record instead of
+        creating a duplicate. This is the expected flow when called from
+        the upload endpoint which already creates the Document row.
 
         Args:
             file_path: Absolute path to the uploaded file on disk
@@ -81,29 +86,38 @@ class IngestorService:
             file_type: File extension (pdf, docx, txt, image)
             subject_id: Subject this document belongs to
             user_id: Owner user ID for access control metadata
+            document_id: Existing document record ID (from upload endpoint)
 
         Returns:
-            Document: Created document record with final processing status
+            Document: Updated document record with final processing status
 
         Raises:
             ValueError: If the file is invalid or text extraction fails
             Exception: For any unexpected processing errors
         """
-        # Step 1: Create document record in database with "processing" status
-        # Mensaje en español para el desarrollador
-        print(f"📄 Procesando documento: {filename}")
+        print(f"📄 Processing document: {filename}")
 
-        document = Document(
-            subject_id=subject_id,
-            filename=filename,
-            file_type=file_type,
-            file_path=file_path,
-            file_size=os.path.getsize(file_path),
-            processing_status="processing",
-        )
-        self.db.add(document)
-        self.db.commit()
-        self.db.refresh(document)
+        # Use existing document record if provided, otherwise create new one
+        if document_id:
+            document = self.db.query(Document).filter(Document.id == document_id).first()
+            if not document:
+                raise ValueError(f"Document {document_id} not found in database")
+            document.processing_status = "processing"
+            self.db.commit()
+            self.db.refresh(document)
+        else:
+            document = Document(
+                user_id=user_id,
+                subject_id=subject_id,
+                filename=filename,
+                file_type=file_type,
+                file_path=file_path,
+                file_size=os.path.getsize(file_path),
+                processing_status="processing",
+            )
+            self.db.add(document)
+            self.db.commit()
+            self.db.refresh(document)
 
         try:
             # Step 2: Extract text from document

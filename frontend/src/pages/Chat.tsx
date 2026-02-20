@@ -141,7 +141,7 @@ export default function Chat() {
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 <div>
                     <h1 className="text-2xl font-bold gradient-text">AI Study Assistant</h1>
-                    <p className="text-xs text-surface-200/50 mt-0.5">Ask questions about your study materials</p>
+                    <p className="text-sm text-surface-200/70 mt-0.5">Ask questions about your study materials</p>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -173,7 +173,7 @@ export default function Chat() {
                     <div className="h-full flex flex-col items-center justify-center text-center p-8">
                         <span className="text-6xl mb-6 opacity-20">🤖</span>
                         <h2 className="text-xl font-semibold text-surface-100">How can I help you study today?</h2>
-                        <p className="text-surface-200/40 mt-2 max-w-md text-sm">
+                        <p className="text-surface-200/60 mt-2 max-w-md text-sm">
                             I can answer questions based on the documents you've uploaded to your subjects.
                             Select a subject above to narrow down the context.
                         </p>
@@ -196,12 +196,12 @@ export default function Chat() {
                             {/* Sources */}
                             {msg.sources && msg.sources.length > 0 && (
                                 <div className="mt-4 pt-3 border-t border-surface-700/50">
-                                    <p className="text-[10px] uppercase tracking-wider text-surface-200/30 font-bold mb-2">Sources</p>
+                                    <p className="text-xs uppercase tracking-wider text-surface-200/60 font-bold mb-2">Sources</p>
                                     <div className="flex flex-wrap gap-2">
                                         {msg.sources.map((source, idx) => (
                                             <div
                                                 key={idx}
-                                                className="text-[10px] px-2 py-1 rounded bg-surface-900/50 border border-surface-700 text-surface-200/60"
+                                                className="text-xs px-2 py-1 rounded bg-surface-900/50 border border-surface-700 text-surface-200/80"
                                                 title={source.excerpt}
                                             >
                                                 📄 {source.filename || 'Document'} ({(source.relevance_score * 100).toFixed(0)}%)
@@ -211,7 +211,7 @@ export default function Chat() {
                                 </div>
                             )}
 
-                            <div className="mt-2 text-[10px] opacity-20 text-right">
+                            <div className="mt-2 text-xs opacity-40 text-right">
                                 {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </div>
                         </div>

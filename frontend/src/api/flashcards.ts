@@ -36,7 +36,7 @@ export interface FlashcardListResponse {
  * Generate flashcards from study materials.
  */
 export async function generateFlashcards(data: FlashcardGenerateRequest): Promise<Flashcard[]> {
-  const res = await apiClient.post('/api/v1/flashcards/generate', data);
+  const res = await apiClient.post('/flashcards/generate', data);
   return res.data;
 }
 
@@ -44,7 +44,7 @@ export async function generateFlashcards(data: FlashcardGenerateRequest): Promis
  * List flashcards for a subject.
  */
 export async function listFlashcards(subjectId: string, dueOnly = false): Promise<FlashcardListResponse> {
-  const res = await apiClient.get('/api/v1/flashcards/', {
+  const res = await apiClient.get('/flashcards/', {
     params: { subject_id: subjectId, due_only: dueOnly },
   });
   return res.data;
@@ -55,7 +55,7 @@ export async function listFlashcards(subjectId: string, dueOnly = false): Promis
  * quality: 0-5 (0=blackout, 5=perfect)
  */
 export async function reviewFlashcard(flashcardId: string, quality: number): Promise<Flashcard> {
-  const res = await apiClient.post(`/api/v1/flashcards/${flashcardId}/review`, { quality });
+  const res = await apiClient.post(`/flashcards/${flashcardId}/review`, { quality });
   return res.data;
 }
 
@@ -63,7 +63,7 @@ export async function reviewFlashcard(flashcardId: string, quality: number): Pro
  * Export flashcards as CSV for Anki import.
  */
 export async function exportFlashcardsCSV(subjectId: string): Promise<string> {
-  const res = await apiClient.get('/api/v1/flashcards/export/csv', {
+  const res = await apiClient.get('/flashcards/export/csv', {
     params: { subject_id: subjectId },
     responseType: 'text',
   });
@@ -74,14 +74,14 @@ export async function exportFlashcardsCSV(subjectId: string): Promise<string> {
  * Delete a specific flashcard.
  */
 export async function deleteFlashcard(flashcardId: string): Promise<void> {
-  await apiClient.delete(`/api/v1/flashcards/${flashcardId}`);
+  await apiClient.delete(`/flashcards/${flashcardId}`);
 }
 
 /**
  * Delete all flashcards for a subject.
  */
 export async function deleteAllFlashcards(subjectId: string): Promise<void> {
-  await apiClient.delete('/api/v1/flashcards/', {
+  await apiClient.delete('/flashcards/', {
     params: { subject_id: subjectId },
   });
 }

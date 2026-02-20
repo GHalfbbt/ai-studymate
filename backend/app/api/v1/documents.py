@@ -191,6 +191,7 @@ def _process_document_sync(
                     file_type=file_type,
                     subject_id=subject_id,
                     user_id=user_id,
+                    document_id=document_id,
                 )
             )
         finally:

@@ -243,7 +243,7 @@ export default function Workspaces() {
                                     className="font-medium text-sm"
                                     onSave={(name) => updateWorkspace(ws.id, { name }).then(u => setWorkspaces(p => p.map(w => w.id === u.id ? u : w)))}
                                 />
-                                <div className="text-[11px] opacity-40">{ws.course_count} courses</div>
+                                <div className="text-xs opacity-60 text-surface-200">{ws.course_count} courses</div>
                             </div>
                             <button onClick={e => { e.stopPropagation(); handleDeleteWs(ws); }} className="text-red-400/50 hover:text-red-400 text-xs ml-1">✕</button>
                         </div>
@@ -266,7 +266,7 @@ export default function Workspaces() {
                                     className="font-medium text-sm"
                                     onSave={(name) => selWs && updateCourse(selWs.id, c.id, { name }).then(u => setCourses(p => p.map(x => x.id === u.id ? u : x)))}
                                 />
-                                <div className="text-[11px] opacity-40">{c.subject_count} subjects</div>
+                                <div className="text-xs opacity-60 text-surface-200">{c.subject_count} subjects</div>
                             </div>
                             <button onClick={e => { e.stopPropagation(); handleDeleteCourse(c); }} className="text-red-400/50 hover:text-red-400 text-xs ml-1">✕</button>
                         </div>
@@ -291,7 +291,7 @@ export default function Workspaces() {
                                         className="font-medium text-sm"
                                         onSave={(name) => selWs && selCourse && updateSubject(selWs.id, selCourse.id, s.id, { name }).then(u => setSubjects(p => p.map(x => x.id === u.id ? u : x)))}
                                     />
-                                    <div className="text-[11px] opacity-40">{s.document_count} docs · {s.topic_count || 0} topics</div>
+                                    <div className="text-xs opacity-60 text-surface-200">{s.document_count} docs · {s.topic_count || 0} topics</div>
                                 </div>
                             </div>
                             <button onClick={e => { e.stopPropagation(); handleDeleteSubject(s); }} className="text-red-400/50 hover:text-red-400 text-xs ml-1">✕</button>
@@ -315,7 +315,7 @@ export default function Workspaces() {
                                     className="font-medium text-sm"
                                     onSave={(name) => selWs && selCourse && selSubject && updateTopic(selWs.id, selCourse.id, selSubject.id, t.id, { name }).then(u => setTopics(p => p.map(x => x.id === u.id ? u : x)))}
                                 />
-                                <div className="text-[11px] opacity-40">{t.document_count} docs</div>
+                                <div className="text-xs opacity-60 text-surface-200">{t.document_count} docs</div>
                             </div>
                             <button onClick={e => { e.stopPropagation(); handleDeleteTopic(t); }} className="text-red-400/50 hover:text-red-400 text-xs ml-1">✕</button>
                         </div>
@@ -327,8 +327,8 @@ export default function Workspaces() {
             {selWs && (
                 <div className="card space-y-4">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-semibold text-surface-100">
-                            📄 Documents <span className="text-xs font-normal text-surface-200/40">({docs.length})</span>
+                        <h2 className="text-lg font-semibold text-surface-50">
+                            📄 Documents <span className="text-sm font-normal text-surface-200/70">({docs.length})</span>
                         </h2>
                         <div className="flex gap-2">
                             {selSubject && (
@@ -363,7 +363,7 @@ export default function Workspaces() {
                                         <span className="text-lg">{doc.file_type === 'pdf' ? '📕' : doc.file_type === 'docx' ? '📘' : '📄'}</span>
                                         <div className="min-w-0">
                                             <div className="text-sm font-medium text-surface-100 truncate">{doc.filename}</div>
-                                            <div className="text-[11px] text-surface-200/40">
+                                            <div className="text-xs text-surface-200/70">
                                                 {doc.file_size ? `${(doc.file_size / 1024 / 1024).toFixed(1)} MB` : '—'} · {doc.chunk_count} chunks
                                             </div>
                                         </div>
@@ -454,7 +454,7 @@ function HierarchyColumn<T extends { id: string }>({
     return (
         <div className="space-y-1.5">
             <div className="flex items-center justify-between mb-2">
-                <h3 className="text-[11px] font-bold uppercase tracking-widest text-surface-200/40">{title}</h3>
+                <h3 className="text-xs font-bold uppercase tracking-widest text-surface-200/80">{title}</h3>
                 {onAdd && <button className="text-[11px] text-primary-400 hover:text-primary-300" onClick={onAdd}>+ Add</button>}
             </div>
             <div className="space-y-1 max-h-[220px] overflow-y-auto pr-1">

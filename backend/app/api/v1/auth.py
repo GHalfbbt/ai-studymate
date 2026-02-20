@@ -3,9 +3,14 @@ Authentication API endpoints.
 
 Provides user registration, login, and profile retrieval.
 Uses JWT tokens for stateless authentication.
+
+Two login endpoints are provided:
+- POST /login       — JSON body (used by the frontend SPA)
+- POST /token       — OAuth2 form (used by Swagger "Authorize" button)
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user
@@ -61,32 +66,66 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     return user
 
 
-@router.post(
-    "/login",
-    response_model=Token,
-    summary="Login and get access token",
-)
-async def login(credentials: UserLogin, db: Session = Depends(get_db)):
-    """
-    Authenticate user and return JWT access token.
+# ─── Internal helper ────────────────────────────────────
 
-    The token should be included in subsequent requests as:
-    Authorization: Bearer <token>
+def _authenticate_user(email: str, password: str, db: Session) -> Token:
     """
-    # Find user by email
-    user = db.query(User).filter(User.email == credentials.email).first()
-    if not user or not verify_password(credentials.password, user.hashed_password):
+    Shared authentication logic for both login endpoints.
+
+    Raises HTTPException 401 if credentials are invalid.
+    Returns a Token on success.
+    """
+    user = db.query(User).filter(User.email == email).first()
+    if not user or not verify_password(password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Create JWT token with user ID as subject
     access_token = create_access_token(subject=str(user.id))
-
     print(f"🔐 Login exitoso: {user.email}")
     return Token(access_token=access_token, token_type="bearer")
+
+
+# ─── JSON login (frontend SPA) ─────────────────────────
+
+@router.post(
+    "/login",
+    response_model=Token,
+    summary="Login with JSON body (frontend)",
+)
+async def login(credentials: UserLogin, db: Session = Depends(get_db)):
+    """
+    Authenticate user with JSON body and return JWT access token.
+
+    Expected body: { "email": "...", "password": "..." }
+
+    The token should be included in subsequent requests as:
+    Authorization: Bearer <token>
+    """
+    return _authenticate_user(credentials.email, credentials.password, db)
+
+
+# ─── OAuth2 form login (Swagger UI) ────────────────────
+
+@router.post(
+    "/token",
+    response_model=Token,
+    summary="Login with OAuth2 form (Swagger)",
+)
+async def login_for_swagger(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    """
+    OAuth2-compatible token endpoint for Swagger UI "Authorize" button.
+
+    Accepts application/x-www-form-urlencoded with:
+    - username (email)
+    - password
+    """
+    return _authenticate_user(form_data.username, form_data.password, db)
 
 
 @router.get(

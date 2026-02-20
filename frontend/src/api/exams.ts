@@ -1,4 +1,4 @@
-/**
+**
  * Exam API service.
  * Handles exam generation, retrieval, submission, and evaluation.
  */
@@ -82,7 +82,7 @@ export interface ExamAttempt {
  * Generate an exam from study materials.
  */
 export async function generateExam(data: ExamGenerateRequest): Promise<Exam> {
-  const res = await apiClient.post('/api/v1/exams/generate', data);
+  const res = await apiClient.post('/exams/generate', data);
   return res.data;
 }
 
@@ -91,7 +91,7 @@ export async function generateExam(data: ExamGenerateRequest): Promise<Exam> {
  */
 export async function listExams(subjectId?: string): Promise<Exam[]> {
   const params = subjectId ? { subject_id: subjectId } : {};
-  const res = await apiClient.get('/api/v1/exams/', { params });
+  const res = await apiClient.get('/exams/', { params });
   return res.data;
 }
 
@@ -99,7 +99,7 @@ export async function listExams(subjectId?: string): Promise<Exam[]> {
  * Get a specific exam by ID.
  */
 export async function getExam(examId: string): Promise<Exam> {
-  const res = await apiClient.get(`/api/v1/exams/${examId}`);
+  const res = await apiClient.get(`/exams/${examId}`);
   return res.data;
 }
 
@@ -107,7 +107,7 @@ export async function getExam(examId: string): Promise<Exam> {
  * Start a new exam attempt.
  */
 export async function startExamAttempt(examId: string): Promise<{ attempt_id: string }> {
-  const res = await apiClient.post(`/api/v1/exams/${examId}/start`);
+  const res = await apiClient.post(`/exams/${examId}/start`);
   return res.data;
 }
 
@@ -115,7 +115,7 @@ export async function startExamAttempt(examId: string): Promise<{ attempt_id: st
  * Submit exam answers for evaluation.
  */
 export async function submitExam(examId: string, answers: SubmitAnswer[]): Promise<ExamResult> {
-  const res = await apiClient.post(`/api/v1/exams/${examId}/submit`, { answers });
+  const res = await apiClient.post(`/exams/${examId}/submit`, { answers });
   return res.data;
 }
 
@@ -123,7 +123,7 @@ export async function submitExam(examId: string, answers: SubmitAnswer[]): Promi
  * List attempts for a specific exam.
  */
 export async function listAttempts(examId: string): Promise<ExamAttempt[]> {
-  const res = await apiClient.get(`/api/v1/exams/${examId}/attempts`);
+  const res = await apiClient.get(`/exams/${examId}/attempts`);
   return res.data;
 }
 
@@ -131,5 +131,5 @@ export async function listAttempts(examId: string): Promise<ExamAttempt[]> {
  * Delete an exam.
  */
 export async function deleteExam(examId: string): Promise<void> {
-  await apiClient.delete(`/api/v1/exams/${examId}`);
+  await apiClient.delete(`/exams/${examId}`);
 }
