@@ -26,7 +26,7 @@
 
   --color-surface-50: #f8fafc;
   --color-surface-100: #f1f5f9;
-  --color-surface-200: #e2e8f0;
+  --color-surface-200: #cbd5e1;
   --color-surface-700: #334155;
   --color-surface-800: #1e293b;
   --color-surface-850: #172033;
@@ -108,16 +108,16 @@
 
 html {
   scroll-behavior: smooth;
-  font-size: 17px;
+  font-size: 16px;
 }
 
 body {
   font-family: var(--font-sans);
   background-color: var(--color-surface-950);
-  color: var(--color-surface-50);
+  color: var(--color-surface-100);
   min-height: 100vh;
   font-size: 1rem;
-  line-height: 1.6;
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
