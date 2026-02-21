@@ -217,6 +217,43 @@ def _process_document_sync(
 
 
 @router.get(
+    "/upload-info",
+    summary="Get upload requirements and limits",
+)
+async def upload_info():
+    """
+    Return file upload requirements: allowed extensions, max size, etc.
+    Useful for the frontend to display upload constraints to the user.
+    """
+    from app.core.config import settings
+    from app.utils.validators import ALLOWED_EXTENSIONS
+
+    max_bytes = settings.MAX_UPLOAD_SIZE
+    max_mb = max_bytes / (1024 * 1024)
+
+    return {
+        "max_file_size_bytes": max_bytes,
+        "max_file_size_mb": round(max_mb, 1),
+        "allowed_extensions": sorted(ALLOWED_EXTENSIONS),
+        "allowed_types_description": {
+            "pdf": "PDF documents (text-based and scanned with OCR)",
+            "docx": "Microsoft Word documents",
+            "odt": "OpenDocument Text files",
+            "txt": "Plain text files (UTF-8 or Latin-1)",
+            "png": "PNG images (stored, no OCR yet)",
+            "jpg": "JPEG images (stored, no OCR yet)",
+            "jpeg": "JPEG images (stored, no OCR yet)",
+        },
+        "notes": [
+            f"Maximum file size: {max_mb:.0f} MB per file",
+            "PDF files with scanned pages use Gemini Vision OCR (requires GEMINI_API_KEY)",
+            "Multiple files can be uploaded at once",
+            "Processing happens in the background after upload",
+        ],
+    }
+
+
+@router.get(
     "/list",
     response_model=DocumentListResponse,
     summary="List documents",

@@ -69,6 +69,7 @@ def generate_exam(
             document_ids=data.document_ids,
             course_id=data.course_id,
             workspace_id=data.workspace_id,
+            num_options=data.num_options,
         )
     except ValueError as e:
         raise HTTPException(
@@ -259,11 +260,20 @@ def submit_exam(
         is_correct = False
         score = 0.0
         feedback_text = ""
+        user_answer = answer_data.user_answer.strip() if answer_data.user_answer else ""
 
-        if question.question_type == "mc":
+        # Handle unanswered questions gracefully
+        if not user_answer:
+            is_correct = False
+            score = 0.0
+            if question.question_type == "mc":
+                feedback_text = f"Not answered. The correct answer is {question.correct_answer}."
+            else:
+                feedback_text = "Not answered."
+        elif question.question_type == "mc":
             # Automatic grading for multiple choice
             is_correct = (
-                answer_data.user_answer.strip().upper()
+                user_answer.upper()
                 == (question.correct_answer or "").strip().upper()
             )
             score = 10.0 if is_correct else 0.0
@@ -280,7 +290,7 @@ def submit_exam(
                 question_text=question.question_text,
                 model_answer=question.model_answer or "",
                 keywords=question.keywords or [],
-                user_answer=answer_data.user_answer,
+                user_answer=user_answer,
             )
             is_correct = eval_result["is_correct"]
             score = eval_result["score"]

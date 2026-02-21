@@ -24,6 +24,9 @@ class ExamGenerate(BaseModel):
     difficulty: str = Field(
         default="medium", description="Target difficulty: easy, medium, hard"
     )
+    num_options: int = Field(
+        default=4, ge=3, le=4, description="Number of options per MC question (3 or 4)"
+    )
     document_ids: Optional[List[UUID]] = Field(
         None, description="Specific documents to generate from"
     )
@@ -62,7 +65,7 @@ class ExamResponse(BaseModel):
 class SubmitAnswer(BaseModel):
     """Schema for submitting an answer to a question."""
     question_id: UUID = Field(..., description="Question being answered")
-    user_answer: str = Field(..., min_length=1, description="User's answer")
+    user_answer: str = Field("", description="User's answer (empty string if unanswered)")
 
 
 class SubmitExam(BaseModel):

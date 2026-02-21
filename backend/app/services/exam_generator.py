@@ -62,8 +62,8 @@ You MUST respond with valid JSON in this exact format:
 
 Rules:
 - Generate EXACTLY the number of questions requested
-- Multiple choice questions MUST have exactly 4 options (A, B, C, D)
-- correct_answer for MC must be one of: "A", "B", "C", "D"
+- Multiple choice questions MUST have the exact number of options requested
+- correct_answer for MC must match one of the option letters (e.g. "A", "B", "C" or "A", "B", "C", "D")
 - Vary the difficulty according to the requested level
 - Questions should test understanding, not just memorization
 - Each question must be directly answerable from the context provided
@@ -124,6 +124,7 @@ Rules:
         document_ids: Optional[List[UUID]] = None,
         course_id: Optional[UUID] = None,
         workspace_id: Optional[UUID] = None,
+        num_options: int = 4,
     ) -> Exam:
         """
         Generate an exam from study materials.
@@ -158,16 +159,19 @@ Rules:
         # Step 2: Build context
         context = "\n\n---\n\n".join(chunks[:15])  # Limit context size
 
-        # Step 3: Build generation prompt
+        # Step 3: Build generation prompt with num_options support
         total_questions = mc_count + short_answer_count
+        option_letters = [chr(65 + i) for i in range(num_options)]  # A, B, C or A, B, C, D
+        options_str = ", ".join(option_letters)
         prompt = (
             f"## Study Material Context:\n\n{context}\n\n"
             f"## Generation Request:\n"
             f"Generate an exam with exactly {total_questions} questions:\n"
-            f"- {mc_count} multiple choice questions\n"
+            f"- {mc_count} multiple choice questions with exactly {num_options} options each ({options_str})\n"
             f"- {short_answer_count} short answer questions\n"
             f"- Target difficulty: {difficulty}\n"
             f"- Mix multiple choice questions first, then short answer questions\n"
+            f"- IMPORTANT: Each MC question must have exactly {num_options} options, correct_answer must be one of: {options_str}\n"
         )
 
         if title:

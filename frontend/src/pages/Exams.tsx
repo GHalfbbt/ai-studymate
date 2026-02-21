@@ -46,6 +46,7 @@ export default function Exams() {
   const [mcCount, setMcCount] = useState(5);
   const [shortCount, setShortCount] = useState(2);
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+  const [numOptions, setNumOptions] = useState<3 | 4>(4);
   const [customTitle, setCustomTitle] = useState('');
 
   // Current exam (taking)
@@ -131,6 +132,7 @@ export default function Exams() {
         mc_count: mcCount,
         short_answer_count: shortCount,
         difficulty,
+        num_options: numOptions,
         title: customTitle || undefined,
       };
       if (scope?.type === 'subject') req.subject_id = selectedScope;
@@ -289,6 +291,33 @@ export default function Exams() {
             <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Short Answer Questions: {shortCount}</span>
             <input type="range" min={0} max={10} value={shortCount} onChange={(e) => setShortCount(Number(e.target.value))} style={{ width: '100%' }} />
           </label>
+
+          {/* Number of options per MC question */}
+          {mcCount > 0 && (
+            <label>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Options per MC Question</span>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {([3, 4] as const).map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setNumOptions(n)}
+                    style={{
+                      flex: 1,
+                      padding: '0.5rem',
+                      borderRadius: 8,
+                      border: numOptions === n ? '2px solid #6366f1' : '2px solid rgba(255,255,255,0.1)',
+                      background: numOptions === n ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.05)',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                      fontWeight: numOptions === n ? 700 : 400,
+                    }}
+                  >
+                    {n === 3 ? '🔤 3 options (A, B, C)' : '🔤 4 options (A, B, C, D)'}
+                  </button>
+                ))}
+              </div>
+            </label>
+          )}
 
           {/* Difficulty */}
           <label>

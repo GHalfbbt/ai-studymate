@@ -15,6 +15,7 @@ export interface ExamGenerateRequest {
   mc_count: number;
   short_answer_count: number;
   difficulty: 'easy' | 'medium' | 'hard';
+  num_options?: 3 | 4;
   document_ids?: string[];
 }
 

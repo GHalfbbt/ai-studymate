@@ -28,8 +28,8 @@ const ACCEPTED_TYPES = {
     'image/jpeg': ['.jpg', '.jpeg'],
 };
 
-// Maximum file size: 10MB
-const MAX_SIZE = 10 * 1024 * 1024;
+// Maximum file size: 50MB (must match backend MAX_UPLOAD_SIZE)
+const MAX_SIZE = 50 * 1024 * 1024;
 
 export default function DropZone({ subjectId, onUploadComplete }: DropZoneProps) {
     const [isUploading, setIsUploading] = useState(false);

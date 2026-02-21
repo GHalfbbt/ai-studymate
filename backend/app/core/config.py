@@ -53,7 +53,7 @@ class Settings(BaseSettings):
 
     # --- File Storage ---
     UPLOAD_DIR: str = "./uploads"
-    MAX_UPLOAD_SIZE: int = 10485760  # 10MB in bytes
+    MAX_UPLOAD_SIZE: int = 52428800  # 50MB in bytes
 
     # --- Voice Services ---
     SPEECHMATICS_API_KEY: Optional[str] = None
