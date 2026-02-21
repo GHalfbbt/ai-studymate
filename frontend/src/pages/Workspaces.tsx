@@ -13,7 +13,7 @@ import {
     listSubjects, createSubject, updateSubject, deleteSubject,
     listTopics, createTopic, updateTopic, deleteTopic,
 } from '../api/workspaces';
-import { uploadDocument, listDocuments, deleteDocument, getDocumentDownloadUrl } from '../api/documents';
+import { uploadDocument, listDocuments, deleteDocument, retryDocument, getDocumentDownloadUrl } from '../api/documents';
 import type { Workspace, Course, Subject, Topic, Document } from '../types';
 import Spinner from '../components/common/Spinner';
 
@@ -424,7 +424,7 @@ export default function Workspaces() {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2">
                                         <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
                                             doc.processing_status === 'completed' ? 'bg-green-500/20 text-green-400'
                                             : doc.processing_status === 'processing' ? 'bg-yellow-500/20 text-yellow-400'
@@ -433,6 +433,22 @@ export default function Workspaces() {
                                         }`}>
                                             {doc.processing_status}
                                         </span>
+                                        {(doc.processing_status === 'failed' || doc.processing_status === 'processing') && (
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        await retryDocument(doc.id);
+                                                        loadDocs();
+                                                    } catch (err) {
+                                                        console.error('Retry failed:', err);
+                                                    }
+                                                }}
+                                                className="text-[11px] px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 font-medium"
+                                                title={doc.processing_error || 'Retry processing'}
+                                            >
+                                                🔄 Retry
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => handleDeleteDoc(doc.id)}
                                             className="text-red-400/40 hover:text-red-400 text-sm"

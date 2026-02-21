@@ -6,9 +6,36 @@ and user queries. Uses the all-MiniLM-L6-v2 model which offers
 a good balance of speed and quality for semantic search.
 """
 
+import threading
 from typing import List
 import numpy as np
 from sentence_transformers import SentenceTransformer
+
+
+# Thread-safe singleton for the embedding model
+_model_lock = threading.Lock()
+_shared_model: SentenceTransformer = None
+_shared_dimension: int = None
+
+
+def _get_shared_model(model_name: str = "all-MiniLM-L6-v2"):
+    """
+    Get or create the shared SentenceTransformer model (singleton).
+    
+    This prevents multiple background threads from loading separate
+    copies of the model, which causes 'meta tensor' errors when
+    torch tries to allocate memory concurrently.
+    """
+    global _shared_model, _shared_dimension
+    if _shared_model is None:
+        with _model_lock:
+            # Double-check inside lock
+            if _shared_model is None:
+                print(f"📥 Cargando modelo de embeddings (singleton): {model_name}...")
+                _shared_model = SentenceTransformer(model_name)
+                _shared_dimension = _shared_model.get_sentence_embedding_dimension()
+                print(f"✅ Modelo cargado. Dimensión: {_shared_dimension}")
+    return _shared_model, _shared_dimension
 
 
 class EmbedderService:
@@ -30,19 +57,15 @@ class EmbedderService:
 
     def __init__(self, model_name: str = MODEL_NAME):
         """
-        Initialize the embedding model.
+        Initialize the embedding service using a shared singleton model.
 
-        Downloads the model on first use (approximately 80MB).
-        Subsequent calls load from cache.
+        The model is loaded once and shared across all instances/threads
+        to prevent concurrent torch model loading crashes (meta tensor errors).
 
         Args:
             model_name: HuggingFace model name for sentence-transformers
         """
-        # Mensaje en español para el desarrollador
-        print(f"📥 Cargando modelo de embeddings: {model_name}...")
-        self.model = SentenceTransformer(model_name)
-        self.embedding_dimension = self.model.get_sentence_embedding_dimension()
-        print(f"✅ Modelo cargado. Dimensión de embeddings: {self.embedding_dimension}")
+        self.model, self.embedding_dimension = _get_shared_model(model_name)
 
     def embed_query(self, text: str) -> List[float]:
         """
@@ -59,10 +82,11 @@ class EmbedderService:
 
     def embed_batch(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
         """
-        Generate embeddings for multiple texts in batch.
+        Generate embeddings for multiple texts in batch (thread-safe).
 
-        Batch processing is significantly faster than encoding one at a time,
-        especially for large document sets.
+        Uses a lock to serialize concurrent encoding calls, preventing
+        torch from crashing when multiple background threads try to
+        use the model simultaneously.
 
         Args:
             texts: List of text strings to embed
@@ -74,12 +98,13 @@ class EmbedderService:
         if not texts:
             return []
 
-        embeddings = self.model.encode(
-            texts,
-            batch_size=batch_size,
-            normalize_embeddings=True,
-            show_progress_bar=len(texts) > 10,  # Show progress for large batches
-        )
+        with _model_lock:
+            embeddings = self.model.encode(
+                texts,
+                batch_size=batch_size,
+                normalize_embeddings=True,
+                show_progress_bar=len(texts) > 10,
+            )
         return embeddings.tolist()
 
     def get_dimension(self) -> int:

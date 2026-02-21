@@ -381,6 +381,59 @@ async def download_document(
     )
 
 
+@router.post(
+    "/{document_id}/retry",
+    response_model=DocumentResponse,
+    summary="Retry processing a failed document",
+)
+async def retry_document(
+    document_id: UUID,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Retry processing a document that previously failed.
+
+    Resets the document status to 'pending' and re-queues it
+    for background processing. Only works on documents with
+    'failed' status.
+    """
+    document = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == current_user.id,
+    ).first()
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    if document.processing_status not in ("failed", "processing"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Document is '{document.processing_status}', not failed. Cannot retry.",
+        )
+
+    # Reset status
+    document.processing_status = "pending"
+    document.processing_error = None
+    document.chunk_count = 0
+    db.commit()
+    db.refresh(document)
+
+    # Re-queue for processing
+    background_tasks.add_task(
+        _process_document_sync,
+        document_id=document.id,
+        file_path=document.file_path,
+        filename=document.filename,
+        file_type=document.file_type,
+        subject_id=document.subject_id,
+        user_id=current_user.id,
+    )
+
+    return document
+
+
 @router.delete(
     "/{document_id}",
     status_code=status.HTTP_204_NO_CONTENT,

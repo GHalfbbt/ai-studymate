@@ -50,13 +50,25 @@ export async function getDocument(documentId: string): Promise<Document> {
     return response.data;
 }
 
+/**
+ * Retry processing a failed document.
+ */
+export async function retryDocument(documentId: string): Promise<any> {
+  const res = await apiClient.post(`/documents/${documentId}/retry`);
+  return res.data;
+}
+
+/**
+ * Delete a document.
+ */
 export async function deleteDocument(documentId: string): Promise<void> {
   await apiClient.delete(`/documents/${documentId}`);
 }
 
 /**
- * Get the download URL for a document.
+ * Get the download URL for a document (for direct browser access).
  */
 export function getDocumentDownloadUrl(documentId: string): string {
-  return `${apiClient.defaults.baseURL}/documents/${documentId}/download`;
+  const baseURL = apiClient.defaults.baseURL || '';
+  return `${baseURL}/documents/${documentId}/download`;
 }
