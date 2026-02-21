@@ -13,7 +13,9 @@ after processing completes.
 """
 
 import os
+import re
 import shutil
+import unicodedata
 from typing import Optional
 from uuid import UUID, uuid4
 
@@ -21,6 +23,30 @@ import httpx
 from fastapi import UploadFile
 
 from app.core.config import settings
+
+
+def _sanitize_filename_for_cloud(filename: str) -> str:
+    """
+    Sanitize a filename for Supabase Storage (which rejects non-ASCII keys).
+
+    Removes accents/diacritics, replaces spaces with underscores,
+    and strips any characters that aren't alphanumeric, hyphens,
+    underscores, or dots.
+
+    Examples:
+        "Presentación Tema 2. Principales amenazas.pdf"
+        → "Presentacion_Tema_2._Principales_amenazas.pdf"
+    """
+    # Decompose unicode characters and remove combining marks (accents)
+    nfkd = unicodedata.normalize("NFKD", filename)
+    ascii_only = nfkd.encode("ascii", "ignore").decode("ascii")
+    # Replace spaces with underscores
+    ascii_only = ascii_only.replace(" ", "_")
+    # Remove any remaining unsafe characters (keep alphanumeric, -, _, .)
+    safe = re.sub(r"[^a-zA-Z0-9_.\-]", "", ascii_only)
+    # Collapse multiple underscores
+    safe = re.sub(r"_+", "_", safe)
+    return safe or "unnamed_file"
 
 
 class StorageService:
@@ -147,7 +173,9 @@ class StorageService:
         # Upload to Supabase Storage if configured
         storage_key = local_path  # default: local path
         if self._supabase_enabled and user_id:
-            object_path = f"{user_id}/{safe_filename}"
+            # Sanitize filename for Supabase (no accents, no spaces, ASCII only)
+            cloud_safe_name = f"{unique_id}_{_sanitize_filename_for_cloud(filename)}"
+            object_path = f"{user_id}/{cloud_safe_name}"
             try:
                 await self._upload_to_supabase(object_path, content, file_extension)
                 storage_key = f"supabase://{self._bucket}/{object_path}"
