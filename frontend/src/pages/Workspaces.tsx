@@ -353,9 +353,18 @@ export default function Workspaces() {
             {selWs && (
                 <div className="card space-y-4">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-semibold text-surface-50">
-                            📄 Documents <span className="text-sm font-normal text-surface-200/70">({docs.length})</span>
-                        </h2>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-lg font-semibold text-surface-50">
+                                📄 Documents <span className="text-sm font-normal text-surface-200/70">({docs.length})</span>
+                            </h2>
+                            <button
+                                onClick={loadDocs}
+                                className="text-surface-200/40 hover:text-primary-400 transition-colors p-1 rounded-lg hover:bg-surface-800/40"
+                                title="Refresh document list"
+                            >
+                                🔄
+                            </button>
+                        </div>
                         <div className="flex gap-2">
                             {selSubject && (
                                 <button
