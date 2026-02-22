@@ -14,6 +14,7 @@ from app.api.v1.documents import router as documents_router
 from app.api.v1.rag import router as rag_router
 from app.api.v1.exams import router as exams_router
 from app.api.v1.flashcards import router as flashcards_router
+from app.api.v1.settings import router as settings_router
 
 # Main API v1 router
 router = APIRouter(prefix="/api/v1")
@@ -54,6 +55,7 @@ router.include_router(documents_router, prefix="/documents", tags=["documents"])
 router.include_router(rag_router, prefix="/rag", tags=["rag"])
 router.include_router(exams_router, prefix="/exams", tags=["exams"])
 router.include_router(flashcards_router, prefix="/flashcards", tags=["flashcards"])
+router.include_router(settings_router, prefix="/settings", tags=["settings"])
 
 # TODO: Include remaining routers (Day 4-5)
 # from app.api.v1.voice import router as voice_router

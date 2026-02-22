@@ -21,6 +21,11 @@ from app.models.user import User
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 
 
+def get_user_llm_provider(current_user: "User") -> str:
+    """Get the user's preferred LLM provider, defaulting to 'auto'."""
+    return getattr(current_user, "llm_provider", None) or "auto"
+
+
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),

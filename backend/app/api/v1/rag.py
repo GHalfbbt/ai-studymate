@@ -44,7 +44,11 @@ def get_vector_store():
     return _vector_store
 
 
-def get_llm():
+def get_llm(provider: str = None):
+    """Get LLM client. If provider specified, creates per-request instance."""
+    if provider and provider != "auto":
+        from app.services.llm_client import LLMClient
+        return LLMClient(provider=provider)
     global _llm
     if _llm is None:
         from app.services.llm_client import LLMClient
@@ -98,7 +102,9 @@ async def rag_query(
     """
     embedder = get_embedder()
     vector_store = get_vector_store()
-    llm = get_llm()
+    # Use user's preferred LLM provider
+    user_provider = getattr(current_user, "llm_provider", None) or "auto"
+    llm = get_llm(provider=user_provider)
 
     # Build metadata filter for the user's documents
     where_filter = {"user_id": str(current_user.id)}

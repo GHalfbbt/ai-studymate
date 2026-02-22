@@ -44,7 +44,8 @@ def generate_flashcards(
     from app.services.llm_client import LLMClient
     from app.services.flashcard_generator import FlashcardGeneratorService
 
-    llm = LLMClient()
+    user_provider = getattr(current_user, "llm_provider", None) or "auto"
+    llm = LLMClient(provider=None if user_provider == "auto" else user_provider)
     generator = FlashcardGeneratorService(db=db, llm=llm)
 
     # Validate at least one scope is provided
@@ -141,7 +142,8 @@ def review_flashcard(
     from app.services.llm_client import LLMClient
     from app.services.flashcard_generator import FlashcardGeneratorService
 
-    llm = LLMClient()
+    user_provider = getattr(current_user, "llm_provider", None) or "auto"
+    llm = LLMClient(provider=None if user_provider == "auto" else user_provider)
     generator = FlashcardGeneratorService(db=db, llm=llm)
 
     try:
@@ -178,7 +180,8 @@ def export_flashcards_csv(
     from app.services.llm_client import LLMClient
     from app.services.flashcard_generator import FlashcardGeneratorService
 
-    llm = LLMClient()
+    user_provider = getattr(current_user, "llm_provider", None) or "auto"
+    llm = LLMClient(provider=None if user_provider == "auto" else user_provider)
     generator = FlashcardGeneratorService(db=db, llm=llm)
     csv_content = generator.export_csv(subject_id)
 

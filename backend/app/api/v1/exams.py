@@ -55,7 +55,8 @@ def generate_exam(
     from app.services.llm_client import LLMClient
     from app.services.exam_generator import ExamGeneratorService
 
-    llm = LLMClient()
+    user_provider = getattr(current_user, "llm_provider", None) or "auto"
+    llm = LLMClient(provider=None if user_provider == "auto" else user_provider)
     generator = ExamGeneratorService(db=db, llm=llm)
 
     try:
@@ -245,7 +246,8 @@ def submit_exam(
     # Build question lookup
     questions_map = {str(q.id): q for q in exam.questions}
 
-    llm = LLMClient()
+    user_provider = getattr(current_user, "llm_provider", None) or "auto"
+    llm = LLMClient(provider=None if user_provider == "auto" else user_provider)
     generator = ExamGeneratorService(db=db, llm=llm)
 
     correct_count = 0

@@ -46,3 +46,20 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     """Schema for decoded token payload."""
     user_id: Optional[str] = None
+
+
+class UserSettings(BaseModel):
+    """Schema for user settings (GET response)."""
+    llm_provider: str = Field(default="auto", description="LLM provider: auto, groq, gemini, or ollama")
+
+    class Config:
+        from_attributes = True
+
+
+class UserSettingsUpdate(BaseModel):
+    """Schema for updating user settings (PUT request)."""
+    llm_provider: str = Field(
+        ...,
+        pattern="^(auto|groq|gemini|ollama)$",
+        description="LLM provider: auto, groq, gemini, or ollama",
+    )

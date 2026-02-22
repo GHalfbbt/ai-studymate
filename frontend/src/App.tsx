@@ -13,6 +13,7 @@ import Chat from './pages/Chat';
 import Workspaces from './pages/Workspaces';
 import Exams from './pages/Exams';
 import Flashcards from './pages/Flashcards';
+import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import { useAuthStore } from './store/authStore';
@@ -94,7 +95,7 @@ export default function App() {
         <Route path="/flashcards" element={<Flashcards />} />
         <Route path="/voice" element={<ComingSoon title="Voice Practice" />} />
         <Route path="/analytics" element={<ComingSoon title="Analytics" />} />
-        <Route path="/settings" element={<ComingSoon title="Settings" />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
 
       {/* Public routes (no auth required) */}

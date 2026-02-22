@@ -52,14 +52,26 @@ class LLMClient:
         Initialize the LLM client with provider fallback chain.
 
         Args:
-            provider: Force a specific provider (overrides env var)
+            provider: Force a specific provider. If None or "auto",
+                      uses env var LLM_PROVIDER with full fallback chain.
+                      If a specific provider name (groq/gemini/ollama),
+                      uses ONLY that provider (no fallback).
         """
         self.clients: List[Dict] = []
         self.active_provider: Optional[str] = None
+        self._single_provider = False
 
-        # Build provider priority list
-        primary = provider or settings.LLM_PROVIDER or "groq"
-        provider_order = self._build_provider_order(primary)
+        # Determine mode: "auto" = fallback chain, specific = single provider
+        resolved = provider if provider and provider != "auto" else None
+        primary = resolved or settings.LLM_PROVIDER or "groq"
+
+        if resolved:
+            # Single provider mode — no fallback
+            self._single_provider = True
+            provider_order = [resolved]
+        else:
+            # Auto/fallback mode
+            provider_order = self._build_provider_order(primary)
 
         for prov_name in provider_order:
             client_info = self._init_provider(prov_name)
