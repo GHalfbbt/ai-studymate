@@ -43,12 +43,13 @@ export async function generateFlashcards(data: FlashcardGenerateRequest): Promis
 }
 
 /**
- * List flashcards for a subject.
+ * List flashcards, optionally filtered by subject.
  */
-export async function listFlashcards(subjectId: string, dueOnly = false): Promise<FlashcardListResponse> {
-  const res = await apiClient.get('/flashcards/', {
-    params: { subject_id: subjectId, due_only: dueOnly },
-  });
+export async function listFlashcards(subjectId?: string, dueOnly = false): Promise<FlashcardListResponse> {
+  const params: Record<string, string | boolean> = {};
+  if (subjectId) params.subject_id = subjectId;
+  if (dueOnly) params.due_only = true;
+  const res = await apiClient.get('/flashcards/', { params });
   return res.data;
 }
 

@@ -106,16 +106,20 @@ export default function Exams() {
       if (opts.length > 0) {
         setSelectedScope(opts[0].id);
         setSelectedType(opts[0].type);
-        if (opts[0].type === 'subject') loadExams(opts[0].id);
+        loadExams(opts[0].id, opts[0].type);
       }
     } catch {
       console.error('Failed to load scopes');
     }
   }
 
-  async function loadExams(subjectId: string) {
+  async function loadExams(scopeId: string, scopeType: 'subject' | 'course' | 'workspace') {
     try {
-      const list = await listExams(subjectId);
+      const filters: Record<string, string> = {};
+      if (scopeType === 'subject') filters.subject_id = scopeId;
+      else if (scopeType === 'course') filters.course_id = scopeId;
+      else if (scopeType === 'workspace') filters.workspace_id = scopeId;
+      const list = await listExams(filters);
       setExams(list);
     } catch {
       setExams([]);
@@ -144,7 +148,7 @@ export default function Exams() {
       setAnswers({});
       setTimeElapsed(0);
       setView('take');
-      if (selectedType === 'subject') loadExams(selectedScope);
+      loadExams(selectedScope, selectedType);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to generate exam');
     } finally {
@@ -206,8 +210,7 @@ export default function Exams() {
             const scope = scopes.find(s => s.id === e.target.value);
             setSelectedScope(e.target.value);
             setSelectedType(scope?.type || 'subject');
-            if (scope?.type === 'subject') loadExams(e.target.value);
-            else setExams([]);
+            loadExams(e.target.value, scope?.type || 'subject');
           }}
           style={{ marginBottom: '1rem', maxWidth: 400 }}
         >

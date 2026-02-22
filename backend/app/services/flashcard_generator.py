@@ -143,15 +143,26 @@ Rules:
             f"- Make each flashcard self-contained (understandable without context)\n"
         )
 
-        # Step 4: Generate with LLM
-        raw_response = self.llm.generate_json(
-            prompt=prompt,
-            system_prompt=self.FLASHCARD_SYSTEM_PROMPT,
-            temperature=0.5,
-        )
-
-        # Step 5: Parse response
-        flashcard_data = self._parse_response(raw_response)
+        # Step 4: Generate with LLM (with retry for transient failures)
+        last_error = None
+        for attempt in range(3):
+            try:
+                raw_response = self.llm.generate_json(
+                    prompt=prompt,
+                    system_prompt=self.FLASHCARD_SYSTEM_PROMPT,
+                    temperature=0.5,
+                )
+                flashcard_data = self._parse_response(raw_response)
+                break
+            except Exception as e:
+                last_error = e
+                if attempt < 2:
+                    import time
+                    time.sleep(2 * (attempt + 1))  # Backoff: 2s, 4s
+                    continue
+                raise ValueError(
+                    f"Failed to generate flashcards after 3 attempts: {str(last_error)}"
+                )
 
         # Step 6: Create database records
         created = []

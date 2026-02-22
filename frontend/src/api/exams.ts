@@ -90,11 +90,14 @@ export async function generateExam(data: ExamGenerateRequest): Promise<Exam> {
 }
 
 /**
- * List exams, optionally filtered by subject.
+ * List exams, optionally filtered by subject, course, or workspace.
  */
-export async function listExams(subjectId?: string): Promise<Exam[]> {
-  const params = subjectId ? { subject_id: subjectId } : {};
-  const res = await apiClient.get('/exams/', { params });
+export async function listExams(filters: {
+  subject_id?: string;
+  course_id?: string;
+  workspace_id?: string;
+} = {}): Promise<Exam[]> {
+  const res = await apiClient.get('/exams/', { params: filters });
   return res.data;
 }
 

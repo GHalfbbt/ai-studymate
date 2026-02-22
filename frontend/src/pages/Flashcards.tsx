@@ -93,14 +93,14 @@ export default function Flashcards() {
       if (opts.length > 0) {
         setSelectedScope(opts[0].id);
         setSelectedType(opts[0].type);
-        if (opts[0].type === 'subject') loadCards(opts[0].id);
+        loadCards(opts[0].type === 'subject' ? opts[0].id : undefined);
       }
     } catch {
       console.error('Failed to load scopes');
     }
   }
 
-  async function loadCards(subjectId: string) {
+  async function loadCards(subjectId?: string) {
     try {
       const res = await listFlashcards(subjectId);
       setCards(res.flashcards);
@@ -402,8 +402,8 @@ export default function Flashcards() {
                 const scope = scopes.find(s => s.id === e.target.value);
                 setSelectedScope(e.target.value);
                 setSelectedType(scope?.type || 'subject');
-                if (scope?.type === 'subject') loadCards(e.target.value);
-                else setCards([]);
+                // Load all user's flashcards (filtered by subject if subject selected)
+                loadCards(scope?.type === 'subject' ? e.target.value : undefined);
               }}
             >
               {scopes.map((s) => (
