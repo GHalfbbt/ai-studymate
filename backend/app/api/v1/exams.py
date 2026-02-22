@@ -410,3 +410,214 @@ def delete_exam(
 
     db.delete(exam)
     db.commit()
+
+
+@router.get("/{exam_id}/export/json")
+def export_exam_json(
+    exam_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Export an exam as JSON with questions, correct answers, and attempt history.
+
+    Includes everything needed to import and restore the exam.
+
+    Args:
+        exam_id: Exam to export
+
+    Returns:
+        JSON with exam, questions, and attempts
+    """
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
+
+    # Get attempts for this user
+    attempts = (
+        db.query(ExamAttempt)
+        .filter(ExamAttempt.exam_id == exam_id, ExamAttempt.user_id == current_user.id)
+        .order_by(ExamAttempt.started_at.desc())
+        .all()
+    )
+
+    export_data = {
+        "version": "1.0",
+        "exported_at": datetime.utcnow().isoformat(),
+        "exam": {
+            "title": exam.title,
+            "description": exam.description,
+            "question_count": exam.question_count,
+            "mc_count": exam.mc_count,
+            "short_answer_count": exam.short_answer_count,
+            "created_at": exam.created_at.isoformat() if exam.created_at else None,
+            "questions": [
+                {
+                    "question_order": q.question_order,
+                    "question_type": q.question_type,
+                    "question_text": q.question_text,
+                    "options": q.options,
+                    "correct_answer": q.correct_answer,
+                    "model_answer": q.model_answer,
+                    "keywords": q.keywords,
+                    "explanation": q.explanation,
+                    "difficulty": q.difficulty,
+                    "topic": q.topic,
+                }
+                for q in sorted(exam.questions, key=lambda x: x.question_order)
+            ],
+        },
+        "attempts": [
+            {
+                "started_at": a.started_at.isoformat() if a.started_at else None,
+                "completed_at": a.completed_at.isoformat() if a.completed_at else None,
+                "status": a.status,
+                "score": a.score,
+                "correct_answers": a.correct_answers,
+                "total_questions": a.total_questions,
+                "answers": [
+                    {
+                        "question_order": ans.question.question_order if ans.question else None,
+                        "user_answer": ans.user_answer,
+                        "is_correct": ans.is_correct,
+                        "score": ans.score,
+                        "feedback": ans.llm_feedback,
+                    }
+                    for ans in (a.answers or [])
+                ],
+            }
+            for a in attempts
+        ],
+    }
+
+    return export_data
+
+
+@router.get("/{exam_id}/export/txt")
+def export_exam_txt(
+    exam_id: UUID,
+    include_answers: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Export an exam as plain text (printable format).
+
+    Args:
+        exam_id: Exam to export
+        include_answers: Whether to include correct answers
+
+    Returns:
+        Plain text exam content
+    """
+    from fastapi.responses import PlainTextResponse
+
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
+
+    lines = []
+    lines.append(f"{'=' * 60}")
+    lines.append(f"  {exam.title}")
+    lines.append(f"{'=' * 60}")
+    if exam.description:
+        lines.append(f"\n{exam.description}\n")
+    lines.append(f"Total questions: {exam.question_count}")
+    lines.append(f"{'─' * 60}\n")
+
+    for q in sorted(exam.questions, key=lambda x: x.question_order):
+        lines.append(f"Question {q.question_order}. [{q.difficulty}] [{q.question_type.upper()}]")
+        lines.append(f"{q.question_text}\n")
+
+        if q.question_type == "mc" and q.options:
+            for i, opt in enumerate(q.options):
+                letter = chr(65 + i)
+                lines.append(f"  {letter}) {opt}")
+            lines.append("")
+
+        if q.question_type == "short_answer":
+            lines.append("  Answer: ___________________________________\n")
+
+        if include_answers:
+            if q.correct_answer:
+                lines.append(f"  ✓ Correct: {q.correct_answer}")
+            if q.model_answer:
+                lines.append(f"  ✓ Model answer: {q.model_answer}")
+            if q.explanation:
+                lines.append(f"  💡 {q.explanation}")
+            lines.append("")
+
+        lines.append(f"{'─' * 60}\n")
+
+    content = "\n".join(lines)
+
+    return PlainTextResponse(
+        content=content,
+        media_type="text/plain",
+        headers={
+            "Content-Disposition": f"attachment; filename=exam_{exam_id}.txt"
+        },
+    )
+
+
+@router.post("/import/json", response_model=ExamResponse, status_code=status.HTTP_201_CREATED)
+def import_exam_json(
+    subject_id: UUID,
+    data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Import an exam from JSON.
+
+    Creates the exam and all questions. Does NOT import attempts
+    (those are user-specific and should be re-taken).
+
+    Args:
+        subject_id: Subject to import into
+        data: JSON with exam and questions
+
+    Returns:
+        Created exam
+    """
+    exam_data = data.get("exam", {})
+    if not exam_data or not exam_data.get("questions"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid import data: must contain 'exam' with 'questions'",
+        )
+
+    questions_data = exam_data.get("questions", [])
+
+    exam = Exam(
+        subject_id=subject_id,
+        title=exam_data.get("title", "Imported Exam"),
+        description=exam_data.get("description", ""),
+        question_count=len(questions_data),
+        mc_count=sum(1 for q in questions_data if q.get("question_type") == "mc"),
+        short_answer_count=sum(1 for q in questions_data if q.get("question_type") == "short_answer"),
+        generated_from_document_ids=[],
+    )
+    db.add(exam)
+    db.flush()
+
+    for q_data in questions_data:
+        question = ExamQuestion(
+            exam_id=exam.id,
+            question_order=q_data.get("question_order", 1),
+            question_type=q_data.get("question_type", "mc"),
+            question_text=q_data.get("question_text", ""),
+            options=q_data.get("options"),
+            correct_answer=q_data.get("correct_answer"),
+            model_answer=q_data.get("model_answer"),
+            keywords=q_data.get("keywords"),
+            explanation=q_data.get("explanation", ""),
+            difficulty=q_data.get("difficulty", "medium"),
+            topic=q_data.get("topic", ""),
+        )
+        db.add(question)
+
+    db.commit()
+    db.refresh(exam)
+
+    return exam

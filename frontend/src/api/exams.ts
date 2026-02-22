@@ -139,3 +139,32 @@ export async function listAttempts(examId: string): Promise<ExamAttempt[]> {
 export async function deleteExam(examId: string): Promise<void> {
   await apiClient.delete(`/exams/${examId}`);
 }
+
+/**
+ * Export exam as JSON with questions, answers, and attempt history.
+ */
+export async function exportExamJSON(examId: string): Promise<any> {
+  const res = await apiClient.get(`/exams/${examId}/export/json`);
+  return res.data;
+}
+
+/**
+ * Export exam as plain text (printable format).
+ */
+export async function exportExamTXT(examId: string, includeAnswers = false): Promise<string> {
+  const res = await apiClient.get(`/exams/${examId}/export/txt`, {
+    params: { include_answers: includeAnswers },
+    responseType: 'text',
+  });
+  return res.data;
+}
+
+/**
+ * Import exam from JSON.
+ */
+export async function importExamJSON(subjectId: string, data: any): Promise<Exam> {
+  const res = await apiClient.post('/exams/import/json', data, {
+    params: { subject_id: subjectId },
+  });
+  return res.data;
+}

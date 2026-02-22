@@ -157,7 +157,7 @@ Rules:
             )
 
         # Step 2: Build context
-        context = "\n\n---\n\n".join(chunks[:15])  # Limit context size
+        context = "\n\n---\n\n".join(chunks[:6])  # Limit context size
 
         # Step 3: Build generation prompt with num_options support
         total_questions = mc_count + short_answer_count

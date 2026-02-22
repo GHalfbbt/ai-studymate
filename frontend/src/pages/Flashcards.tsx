@@ -20,6 +20,8 @@ import {
   reviewFlashcard,
   exportFlashcardsCSV,
   deleteAllFlashcards,
+  exportFlashcardsJSON,
+  importFlashcardsJSON,
   type Flashcard,
 } from '../api/flashcards';
 
@@ -382,7 +384,39 @@ export default function Flashcards() {
   // ── LIST MODE ──
   return (
     <div style={{ padding: '2rem', maxWidth: 900, margin: '0 auto' }}>
-      <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1.5rem' }}>🃏 Flashcards</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>🃏 Flashcards</h1>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {selectedType === 'subject' && (
+            <label
+              className="btn"
+              style={{ background: 'rgba(99,102,241,0.15)', border: '2px solid rgba(99,102,241,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+              title="Load flashcards from a previously exported JSON file"
+            >
+              📂 Import Flashcards from File
+              <input
+                type="file"
+                accept=".json"
+                style={{ display: 'none' }}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    const text = await file.text();
+                    const data = JSON.parse(text);
+                    const imported = await importFlashcardsJSON(selectedScope, data);
+                    setCards(prev => [...imported, ...prev]);
+                    setError('');
+                  } catch (err: any) {
+                    setError(err.response?.data?.detail || 'Failed to import flashcards');
+                  }
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          )}
+        </div>
+      </div>
 
       {error && (
         <div style={{ padding: '0.75rem', background: 'rgba(239,68,68,0.15)', borderRadius: 8, marginBottom: '1rem', color: '#ef4444' }}>
@@ -471,7 +505,7 @@ export default function Flashcards() {
 
       {/* Actions bar */}
       {cards.length > 0 && (
-        <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
           <button className="btn btn-primary" onClick={() => startReview('all')} style={{ flex: 1 }}>
             🎯 Review All {cards.length} Cards
           </button>
@@ -479,10 +513,31 @@ export default function Flashcards() {
             className="btn"
             onClick={handleExport}
             style={{ background: 'rgba(255,255,255,0.1)' }}
-            title="Export as Anki-compatible file with tags"
+            title="Download as Anki-compatible file (.txt with tags)"
           >
-            📥 Export Anki
+            📥 Save for Anki
           </button>
+          {selectedType === 'subject' && (
+            <button
+              className="btn"
+              onClick={async () => {
+                try {
+                  const data = await exportFlashcardsJSON(selectedScope);
+                  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `flashcards_${selectedScope}.json`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                } catch { setError('Failed to export JSON'); }
+              }}
+              style={{ background: 'rgba(255,255,255,0.1)' }}
+              title="Download as JSON with full spaced repetition state (can be re-imported)"
+            >
+              📥 Save as JSON
+            </button>
+          )}
         </div>
       )}
 

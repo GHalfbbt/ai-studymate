@@ -1,7 +1,11 @@
 """
 LLM client service for AI text generation.
 
-Supports Groq API (primary) with OpenAI-compatible interface.
+Supports multiple providers with automatic fallback:
+- Groq (primary, free tier)
+- Google Gemini (free tier)
+- Ollama (local, unlimited)
+
 Used for RAG responses, exam generation, and flashcard creation.
 """
 
@@ -14,26 +18,151 @@ from app.core.config import settings
 
 class LLMClient:
     """
-    LLM client using Groq API with OpenAI-compatible SDK.
+    Multi-provider LLM client with automatic fallback.
 
-    Groq provides extremely fast inference for open-source models
-    like Llama 3 and Mixtral via their API.
+    Provider priority (configurable via LLM_PROVIDER env var):
+    1. groq - Fast cloud inference (free tier: 100k tokens/day)
+    2. gemini - Google Gemini free tier (generous limits)
+    3. ollama - Local inference (unlimited, requires local setup)
+
+    All providers use OpenAI-compatible SDK interface.
     """
 
-    def __init__(self):
-        """Initialize the Groq client."""
-        api_key = settings.GROQ_API_KEY
-        if not api_key:
-            print("⚠️ GROQ_API_KEY not set — LLM features will not work")
-            self.client = None
-            return
+    # Provider configurations
+    PROVIDERS = {
+        "groq": {
+            "base_url": "https://api.groq.com/openai/v1",
+            "default_model": "llama-3.3-70b-versatile",
+            "json_mode": True,
+        },
+        "gemini": {
+            "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+            "default_model": "gemini-2.0-flash",
+            "json_mode": True,
+        },
+        "ollama": {
+            "base_url": "http://host.docker.internal:11434/v1",
+            "default_model": "llama3.2",
+            "json_mode": False,  # Ollama doesn't always support response_format
+        },
+    }
 
-        self.client = OpenAI(
-            api_key=api_key,
-            base_url="https://api.groq.com/openai/v1",
-        )
-        self.default_model = settings.GROQ_MODEL_NAME
-        print(f"✅ LLM Client inicializado (Groq - {self.default_model})")
+    def __init__(self, provider: Optional[str] = None):
+        """
+        Initialize the LLM client with provider fallback chain.
+
+        Args:
+            provider: Force a specific provider (overrides env var)
+        """
+        self.clients: List[Dict] = []
+        self.active_provider: Optional[str] = None
+
+        # Build provider priority list
+        primary = provider or settings.LLM_PROVIDER or "groq"
+        provider_order = self._build_provider_order(primary)
+
+        for prov_name in provider_order:
+            client_info = self._init_provider(prov_name)
+            if client_info:
+                self.clients.append(client_info)
+
+        if self.clients:
+            self.active_provider = self.clients[0]["name"]
+            print(f"✅ LLM Client initialized: {self.active_provider} ({self.clients[0]['model']})")
+            if len(self.clients) > 1:
+                fallbacks = [c["name"] for c in self.clients[1:]]
+                print(f"   Fallbacks: {' → '.join(fallbacks)}")
+        else:
+            print("⚠️ No LLM providers configured — LLM features will not work")
+
+    def _build_provider_order(self, primary: str) -> List[str]:
+        """Build ordered list of providers to try."""
+        all_providers = ["groq", "gemini", "ollama"]
+        order = [primary]
+        for p in all_providers:
+            if p not in order:
+                order.append(p)
+        return order
+
+    def _init_provider(self, name: str) -> Optional[Dict]:
+        """Initialize a single provider, returns None if not configured."""
+        config = self.PROVIDERS.get(name)
+        if not config:
+            return None
+
+        if name == "groq":
+            api_key = settings.GROQ_API_KEY
+            if not api_key:
+                return None
+            model = settings.GROQ_MODEL_NAME or config["default_model"]
+            return {
+                "name": "groq",
+                "client": OpenAI(api_key=api_key, base_url=config["base_url"]),
+                "model": model,
+                "json_mode": config["json_mode"],
+            }
+
+        elif name == "gemini":
+            api_key = settings.GEMINI_API_KEY
+            if not api_key:
+                return None
+            model = settings.GEMINI_MODEL or config["default_model"]
+            return {
+                "name": "gemini",
+                "client": OpenAI(api_key=api_key, base_url=config["base_url"]),
+                "model": model,
+                "json_mode": config["json_mode"],
+            }
+
+        elif name == "ollama":
+            # Ollama is always "available" if configured — it's local
+            # We'll try to connect and fail gracefully
+            try:
+                client = OpenAI(api_key="ollama", base_url=config["base_url"])
+                return {
+                    "name": "ollama",
+                    "client": client,
+                    "model": config["default_model"],
+                    "json_mode": config["json_mode"],
+                }
+            except Exception:
+                return None
+
+        return None
+
+    def _call_with_fallback(self, call_fn, **kwargs) -> str:
+        """
+        Execute an LLM call with automatic fallback to next provider.
+
+        Args:
+            call_fn: Function that takes (client_info, **kwargs) and returns str
+
+        Returns:
+            Generated text response
+        """
+        last_error = None
+        for client_info in self.clients:
+            try:
+                result = call_fn(client_info, **kwargs)
+                # Update active provider if we fell back
+                if client_info["name"] != self.active_provider:
+                    print(f"🔄 LLM fallback: {self.active_provider} → {client_info['name']}")
+                    self.active_provider = client_info["name"]
+                return result
+            except Exception as e:
+                error_str = str(e)
+                last_error = e
+                # Log the failure
+                print(f"⚠️ LLM provider {client_info['name']} failed: {error_str[:200]}")
+                # If rate limited, try next provider
+                if "429" in error_str or "rate_limit" in error_str.lower():
+                    continue
+                # For other errors on non-last provider, try next
+                if client_info != self.clients[-1]:
+                    continue
+                raise
+
+        raise last_error or RuntimeError("No LLM providers available")
 
     def generate(
         self,
@@ -44,7 +173,7 @@ class LLMClient:
         max_tokens: int = 2000,
     ) -> str:
         """
-        Generate text from a prompt.
+        Generate text from a prompt with automatic provider fallback.
 
         Args:
             prompt: User message / question
@@ -56,20 +185,22 @@ class LLMClient:
         Returns:
             Generated text response
         """
-        if not self.client:
-            return "⚠️ LLM not configured. Please set GROQ_API_KEY in .env"
+        if not self.clients:
+            return "⚠️ LLM not configured. Please set GROQ_API_KEY, GEMINI_API_KEY, or configure Ollama."
 
-        response = self.client.chat.completions.create(
-            model=model or self.default_model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
+        def _do_generate(client_info, **kw):
+            response = client_info["client"].chat.completions.create(
+                model=model or client_info["model"],
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            return response.choices[0].message.content
 
-        return response.choices[0].message.content
+        return self._call_with_fallback(_do_generate)
 
     def generate_with_context(
         self,
@@ -107,7 +238,7 @@ class LLMClient:
         return self.generate(
             prompt=rag_prompt,
             system_prompt=rag_system,
-            temperature=0.3,  # Lower temperature for factual answers
+            temperature=0.3,
             max_tokens=3000,
         )
 
@@ -119,6 +250,7 @@ class LLMClient:
     ) -> str:
         """
         Generate a JSON response (for exam/flashcard generation).
+        Falls back between providers automatically.
 
         Args:
             prompt: The generation prompt
@@ -127,18 +259,37 @@ class LLMClient:
         Returns:
             Raw string response (caller parses JSON)
         """
-        if not self.client:
+        if not self.clients:
             return '{"error": "LLM not configured"}'
 
-        response = self.client.chat.completions.create(
-            model=self.default_model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=temperature,
-            max_tokens=4000,
-            response_format={"type": "json_object"},
-        )
+        def _do_json(client_info, **kw):
+            create_kwargs = {
+                "model": client_info["model"],
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": temperature,
+                "max_tokens": 4000,
+            }
+            # Only add response_format for providers that support it
+            if client_info["json_mode"]:
+                create_kwargs["response_format"] = {"type": "json_object"}
 
-        return response.choices[0].message.content
+            response = client_info["client"].chat.completions.create(**create_kwargs)
+            return response.choices[0].message.content
+
+        return self._call_with_fallback(_do_json)
+
+    def get_provider_status(self) -> Dict:
+        """
+        Get current provider status for debugging/UI display.
+
+        Returns:
+            Dict with active provider and available fallbacks
+        """
+        return {
+            "active_provider": self.active_provider,
+            "available_providers": [c["name"] for c in self.clients],
+            "models": {c["name"]: c["model"] for c in self.clients},
+        }

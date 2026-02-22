@@ -88,3 +88,23 @@ export async function deleteAllFlashcards(subjectId: string): Promise<void> {
     params: { subject_id: subjectId },
   });
 }
+
+/**
+ * Export flashcards as JSON with full spaced repetition state.
+ */
+export async function exportFlashcardsJSON(subjectId: string): Promise<any> {
+  const res = await apiClient.get('/flashcards/export/json', {
+    params: { subject_id: subjectId },
+  });
+  return res.data;
+}
+
+/**
+ * Import flashcards from JSON with full state.
+ */
+export async function importFlashcardsJSON(subjectId: string, data: any): Promise<Flashcard[]> {
+  const res = await apiClient.post('/flashcards/import/json', data, {
+    params: { subject_id: subjectId },
+  });
+  return res.data;
+}

@@ -234,3 +234,122 @@ def delete_all_flashcards(
     """
     db.query(Flashcard).filter(Flashcard.subject_id == subject_id).delete()
     db.commit()
+
+
+@router.get("/export/json")
+def export_flashcards_json(
+    subject_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Export flashcards as JSON with full spaced repetition state.
+
+    Includes pool, difficulty, review history, ease factor — everything
+    needed to import and restore the exact learning state.
+
+    Args:
+        subject_id: Subject to export
+
+    Returns:
+        JSON with flashcards and full state
+    """
+    flashcards = (
+        db.query(Flashcard)
+        .filter(Flashcard.subject_id == subject_id)
+        .order_by(Flashcard.created_at)
+        .all()
+    )
+
+    if not flashcards:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No flashcards found for this subject",
+        )
+
+    export_data = {
+        "version": "1.0",
+        "subject_id": str(subject_id),
+        "exported_at": __import__("datetime").datetime.utcnow().isoformat(),
+        "total": len(flashcards),
+        "flashcards": [
+            {
+                "front": fc.front,
+                "back": fc.back,
+                "difficulty": fc.difficulty,
+                "times_reviewed": fc.times_reviewed or 0,
+                "ease_factor": fc.ease_factor or 2.5,
+                "last_reviewed": fc.last_reviewed.isoformat() if fc.last_reviewed else None,
+                "next_review": fc.next_review.isoformat() if fc.next_review else None,
+                "created_at": fc.created_at.isoformat() if fc.created_at else None,
+            }
+            for fc in flashcards
+        ],
+    }
+
+    return export_data
+
+
+@router.post("/import/json", response_model=List[FlashcardResponse], status_code=status.HTTP_201_CREATED)
+def import_flashcards_json(
+    subject_id: UUID,
+    data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Import flashcards from JSON with full spaced repetition state.
+
+    Restores pool, difficulty, review history, ease factor.
+
+    Args:
+        subject_id: Subject to import into
+        data: JSON with flashcards array
+
+    Returns:
+        List of created flashcards
+    """
+    from datetime import datetime
+
+    flashcards_data = data.get("flashcards", [])
+    if not flashcards_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No flashcards found in import data",
+        )
+
+    created = []
+    for fc_data in flashcards_data:
+        # Parse dates if provided
+        last_reviewed = None
+        next_review = None
+        created_at = None
+        if fc_data.get("last_reviewed"):
+            try:
+                last_reviewed = datetime.fromisoformat(fc_data["last_reviewed"])
+            except (ValueError, TypeError):
+                pass
+        if fc_data.get("next_review"):
+            try:
+                next_review = datetime.fromisoformat(fc_data["next_review"])
+            except (ValueError, TypeError):
+                pass
+
+        flashcard = Flashcard(
+            subject_id=subject_id,
+            front=fc_data.get("front", ""),
+            back=fc_data.get("back", ""),
+            difficulty=fc_data.get("difficulty", "medium"),
+            times_reviewed=fc_data.get("times_reviewed", 0),
+            ease_factor=fc_data.get("ease_factor", 2.5),
+            last_reviewed=last_reviewed,
+            next_review=next_review,
+        )
+        db.add(flashcard)
+        created.append(flashcard)
+
+    db.commit()
+    for fc in created:
+        db.refresh(fc)
+
+    return created

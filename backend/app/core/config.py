@@ -39,13 +39,15 @@ class Settings(BaseSettings):
         """Parse comma-separated CORS origins into a list."""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
 
-    # --- LLM Provider ---
-    LLM_PROVIDER: str = "groq"  # groq, openai, gemini
+    # --- LLM Provider (with fallback chain) ---
+    LLM_PROVIDER: str = "groq"  # groq, gemini, ollama (primary provider)
     GROQ_API_KEY: Optional[str] = None
-    GROQ_MODEL_NAME: str = "llama-3.1-8b-instant"
+    GROQ_MODEL_NAME: str = "llama-3.3-70b-versatile"
     GEMINI_API_KEY: Optional[str] = None
-    GEMINI_MODEL: str = "gemini-1.5-flash-lite"
+    GEMINI_MODEL: str = "gemini-2.0-flash"
     OPENAI_API_KEY: Optional[str] = None
+    OLLAMA_BASE_URL: str = "http://host.docker.internal:11434/v1"
+    OLLAMA_MODEL: str = "llama3.2"
 
     # --- Vector Database ---
     VECTOR_DB_PATH: str = "./data/chromadb"

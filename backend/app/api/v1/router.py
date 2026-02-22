@@ -34,6 +34,19 @@ async def health_check():
     }
 
 
+@router.get("/llm/status", tags=["health"])
+async def llm_status():
+    """
+    Get current LLM provider status and available fallbacks.
+
+    Returns:
+        dict: Active provider, available providers, and models
+    """
+    from app.services.llm_client import LLMClient
+    llm = LLMClient()
+    return llm.get_provider_status()
+
+
 # Include active routers
 router.include_router(auth_router, prefix="/auth", tags=["auth"])
 router.include_router(workspaces_router, prefix="/workspaces", tags=["workspaces"])

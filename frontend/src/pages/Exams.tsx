@@ -13,6 +13,9 @@ import {
   generateExam,
   listExams,
   submitExam,
+  exportExamJSON,
+  exportExamTXT,
+  importExamJSON,
   type Exam,
   type ExamQuestion,
   type ExamResult,
@@ -194,13 +197,49 @@ export default function Exams() {
       <div style={{ padding: '2rem', maxWidth: 900, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>📝 Exams</h1>
-          <button
-            className="btn btn-primary"
-            onClick={() => setView('generate')}
-          >
-            + Generate Exam
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {selectedType === 'subject' && (
+              <label
+                className="btn"
+                style={{ background: 'rgba(99,102,241,0.15)', border: '2px solid rgba(99,102,241,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                title="Load a previously exported exam (.json)"
+              >
+                📂 Import Exam from File
+                <input
+                  type="file"
+                  accept=".json"
+                  style={{ display: 'none' }}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      const text = await file.text();
+                      const data = JSON.parse(text);
+                      const imported = await importExamJSON(selectedScope, data);
+                      setExams(prev => [imported, ...prev]);
+                      setError('');
+                    } catch (err: any) {
+                      setError(err.response?.data?.detail || 'Failed to import exam');
+                    }
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+            )}
+            <button
+              className="btn btn-primary"
+              onClick={() => setView('generate')}
+            >
+              ✨ Generate New Exam
+            </button>
+          </div>
         </div>
+
+        {error && (
+          <div style={{ padding: '0.75rem', background: 'rgba(239,68,68,0.15)', borderRadius: 8, marginBottom: '1rem', color: '#ef4444' }}>
+            {error}
+          </div>
+        )}
 
         {/* Scope filter */}
         <select
@@ -229,15 +268,53 @@ export default function Exams() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {exams.map((exam) => (
               <div key={exam.id} className="card" style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
+              <div style={{ flex: 1 }}>
                   <h3 style={{ fontWeight: 600 }}>{exam.title}</h3>
                   <p style={{ fontSize: '0.85rem', opacity: 0.7 }}>
                     {exam.mc_count} MC + {exam.short_answer_count} short answer · {new Date(exam.created_at).toLocaleDateString()}
                   </p>
                 </div>
-                <button className="btn btn-primary" onClick={() => startExam(exam)}>
-                  Take Exam →
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button
+                    className="btn"
+                    style={{ background: 'rgba(255,255,255,0.08)', fontSize: '0.8rem', padding: '0.4rem 0.6rem' }}
+                    title="Export as JSON"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        const data = await exportExamJSON(exam.id);
+                        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `exam_${exam.id}.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      } catch { setError('Failed to export exam'); }
+                    }}
+                  >📥 Save as JSON</button>
+                  <button
+                    className="btn"
+                    style={{ background: 'rgba(255,255,255,0.08)', fontSize: '0.8rem', padding: '0.4rem 0.6rem' }}
+                    title="Download as printable text file"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        const txt = await exportExamTXT(exam.id, true);
+                        const blob = new Blob([txt], { type: 'text/plain' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `exam_${exam.id}.txt`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      } catch { setError('Failed to export exam'); }
+                    }}
+                  >📄 Save as TXT</button>
+                  <button className="btn btn-primary" onClick={() => startExam(exam)}>
+                    Take →
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -368,11 +445,19 @@ export default function Exams() {
 
     return (
       <div style={{ padding: '2rem', maxWidth: 800, margin: '0 auto' }}>
-        {/* Header with timer */}
+        {/* Header with timer and cancel */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', position: 'sticky', top: 0, background: 'var(--bg-primary, #0f172a)', padding: '0.5rem 0', zIndex: 10 }}>
-          <div>
-            <h1 style={{ fontSize: '1.25rem', fontWeight: 700 }}>{currentExam.title}</h1>
-            <p style={{ fontSize: '0.85rem', opacity: 0.7 }}>{answeredCount}/{totalQ} answered</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <button
+              onClick={() => { if (confirm('Are you sure you want to leave? Your answers will be lost.')) setView('list'); }}
+              style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, color: '#ef4444', cursor: 'pointer', padding: '0.4rem 0.75rem', fontSize: '0.85rem', fontWeight: 600 }}
+            >
+              ✕ Cancel
+            </button>
+            <div>
+              <h1 style={{ fontSize: '1.25rem', fontWeight: 700 }}>{currentExam.title}</h1>
+              <p style={{ fontSize: '0.85rem', opacity: 0.7 }}>{answeredCount}/{totalQ} answered</p>
+            </div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '1.5rem', fontFamily: 'monospace', fontWeight: 700 }}>
