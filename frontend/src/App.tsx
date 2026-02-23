@@ -13,6 +13,7 @@ import Chat from './pages/Chat';
 import Workspaces from './pages/Workspaces';
 import Exams from './pages/Exams';
 import Flashcards from './pages/Flashcards';
+import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -94,7 +95,7 @@ export default function App() {
         <Route path="/exams" element={<Exams />} />
         <Route path="/flashcards" element={<Flashcards />} />
         <Route path="/voice" element={<ComingSoon title="Voice Practice" />} />
-        <Route path="/analytics" element={<ComingSoon title="Analytics" />} />
+        <Route path="/analytics" element={<Analytics />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
 
