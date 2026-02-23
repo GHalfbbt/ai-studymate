@@ -113,7 +113,7 @@ html {
 
 body {
   font-family: var(--font-sans);
-  background-color: var(--color-surface-950);
+  background-color: #0a1228;
   color: var(--color-surface-100);
   min-height: 100vh;
   font-size: 1rem;
@@ -350,4 +350,13 @@ body {
   background: var(--color-accent-500);
   bottom: -200px;
   left: -200px;
+}
+
+/* --- Chat Bubble Shadows --- */
+.chat-bubble-user {
+  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.12);
+}
+
+.chat-bubble-assistant {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
 }
