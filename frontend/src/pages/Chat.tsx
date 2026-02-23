@@ -13,11 +13,9 @@ import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { listWorkspaces, listCourses, listSubjects } from '../api/workspaces';
 import { queryRAG } from '../api/rag';
+import apiClient from '../api/client';
 import type { ChatMessage, Workspace, RAGSource } from '../types';
 import Spinner from '../components/common/Spinner';
-
-// API base URL for document download links
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -282,12 +280,38 @@ export default function Chat() {
 
     // ─── Source click handler ───────────────────────────
 
-    const handleSourceClick = (source: RAGSource) => {
-        if (source.document_id) {
-            const token = localStorage.getItem('access_token');
-            const url = `${API_URL}/api/v1/documents/${source.document_id}/download`;
-            // Open in new tab with auth
-            window.open(url, '_blank');
+    const handleSourceClick = async (source: RAGSource) => {
+        if (!source.document_id) return;
+
+        try {
+            // Use authenticated axios client to fetch the file as a blob
+            const response = await apiClient.get(
+                `/documents/${source.document_id}/download`,
+                { responseType: 'blob' }
+            );
+
+            // Create a blob URL and open it in a new tab
+            const blob = new Blob([response.data], {
+                type: response.headers['content-type'] || 'application/octet-stream',
+            });
+            const blobUrl = URL.createObjectURL(blob);
+            const newTab = window.open(blobUrl, '_blank');
+
+            // Revoke the blob URL after a delay to free memory
+            if (newTab) {
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+            } else {
+                // Fallback: trigger download if popup blocked
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = source.document_name || 'document';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+            }
+        } catch (error) {
+            console.error('Failed to download document:', error);
         }
     };
 
