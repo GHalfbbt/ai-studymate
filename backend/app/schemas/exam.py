@@ -62,6 +62,32 @@ class ExamResponse(BaseModel):
         from_attributes = True
 
 
+class LatestAttemptSummary(BaseModel):
+    """Summary of the latest completed attempt for an exam."""
+    score: float
+    correct_answers: int
+    total_questions: int
+    completed_at: datetime
+
+
+class ExamListResponse(BaseModel):
+    """Schema for exam list response with attempt summary."""
+    id: UUID
+    subject_id: Optional[UUID] = None
+    title: str
+    description: Optional[str]
+    question_count: int
+    mc_count: int
+    short_answer_count: int
+    questions: List[ExamQuestionResponse]
+    created_at: datetime
+    attempt_count: int = 0
+    latest_attempt: Optional[LatestAttemptSummary] = None
+
+    class Config:
+        from_attributes = True
+
+
 class SubmitAnswer(BaseModel):
     """Schema for submitting an answer to a question."""
     question_id: UUID = Field(..., description="Question being answered")

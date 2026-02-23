@@ -29,6 +29,13 @@ export interface ExamQuestion {
   topic?: string;
 }
 
+export interface LatestAttemptSummary {
+  score: number;
+  correct_answers: number;
+  total_questions: number;
+  completed_at: string;
+}
+
 export interface Exam {
   id: string;
   subject_id: string;
@@ -39,6 +46,8 @@ export interface Exam {
   short_answer_count: number;
   questions: ExamQuestion[];
   created_at: string;
+  attempt_count?: number;
+  latest_attempt?: LatestAttemptSummary | null;
 }
 
 export interface SubmitAnswer {
@@ -130,6 +139,14 @@ export async function submitExam(examId: string, answers: SubmitAnswer[]): Promi
  */
 export async function listAttempts(examId: string): Promise<ExamAttempt[]> {
   const res = await apiClient.get(`/exams/${examId}/attempts`);
+  return res.data;
+}
+
+/**
+ * Get the latest completed attempt results for review.
+ */
+export async function reviewExam(examId: string): Promise<ExamResult> {
+  const res = await apiClient.get(`/exams/${examId}/review`);
   return res.data;
 }
 

@@ -11,6 +11,7 @@ Used for RAG responses, exam generation, and flashcard creation.
 
 from typing import List, Optional, Dict
 
+from httpx import Timeout
 from openai import OpenAI
 
 from app.core.config import settings
@@ -28,6 +29,9 @@ class LLMClient:
     All providers use OpenAI-compatible SDK interface.
     """
 
+    # Timeout for LLM API calls (connect=10s, read/write/pool=120s)
+    LLM_TIMEOUT = Timeout(120.0, connect=10.0)
+
     # Provider configurations
     PROVIDERS = {
         "groq": {
@@ -42,7 +46,7 @@ class LLMClient:
         },
         "ollama": {
             "base_url": "http://host.docker.internal:11434/v1",
-            "default_model": "llama3.2",
+            "default_model": "llama3:latest",
             "json_mode": False,  # Ollama doesn't always support response_format
         },
     }
@@ -109,7 +113,7 @@ class LLMClient:
             model = settings.GROQ_MODEL_NAME or config["default_model"]
             return {
                 "name": "groq",
-                "client": OpenAI(api_key=api_key, base_url=config["base_url"]),
+                "client": OpenAI(api_key=api_key, base_url=config["base_url"], timeout=self.LLM_TIMEOUT),
                 "model": model,
                 "json_mode": config["json_mode"],
             }
@@ -121,7 +125,7 @@ class LLMClient:
             model = settings.GEMINI_MODEL or config["default_model"]
             return {
                 "name": "gemini",
-                "client": OpenAI(api_key=api_key, base_url=config["base_url"]),
+                "client": OpenAI(api_key=api_key, base_url=config["base_url"], timeout=self.LLM_TIMEOUT),
                 "model": model,
                 "json_mode": config["json_mode"],
             }
@@ -130,11 +134,14 @@ class LLMClient:
             # Ollama is always "available" if configured — it's local
             # We'll try to connect and fail gracefully
             try:
-                client = OpenAI(api_key="ollama", base_url=config["base_url"])
+                base_url = settings.OLLAMA_BASE_URL or config["base_url"]
+                model = settings.OLLAMA_MODEL or config["default_model"]
+                print(f"🔧 [Ollama init] base_url={base_url}, model={model}, OLLAMA_MODEL={settings.OLLAMA_MODEL}, OLLAMA_BASE_URL={settings.OLLAMA_BASE_URL}")
+                client = OpenAI(api_key="ollama", base_url=base_url, timeout=self.LLM_TIMEOUT)
                 return {
                     "name": "ollama",
                     "client": client,
-                    "model": config["default_model"],
+                    "model": model,
                     "json_mode": config["json_mode"],
                 }
             except Exception:
@@ -275,6 +282,8 @@ class LLMClient:
             return '{"error": "LLM not configured"}'
 
         def _do_json(client_info, **kw):
+            # Use higher max_tokens for Ollama (local models need more room for JSON)
+            tokens = 8000 if client_info["name"] == "ollama" else 4000
             create_kwargs = {
                 "model": client_info["model"],
                 "messages": [
@@ -282,7 +291,7 @@ class LLMClient:
                     {"role": "user", "content": prompt},
                 ],
                 "temperature": temperature,
-                "max_tokens": 4000,
+                "max_tokens": tokens,
             }
             # Only add response_format for providers that support it
             if client_info["json_mode"]:
