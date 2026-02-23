@@ -197,7 +197,7 @@ export default function Exams() {
   // ── LIST VIEW ──
   if (view === 'list') {
     return (
-      <div style={{ padding: '2rem', maxWidth: 900, margin: '0 auto' }}>
+      <div style={{ padding: '2rem', maxWidth: 1000, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>📝 Exams</h1>
           <div style={{ display: 'flex', gap: '0.5rem' }}>

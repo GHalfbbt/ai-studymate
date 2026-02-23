@@ -83,7 +83,7 @@ export default function Layout() {
                 <Header onToggleSidebar={handleToggleSidebar} />
 
                 {/* Page content - rendered by React Router */}
-                <main className="p-4 md:p-6 relative z-10">
+                <main className="p-4 md:p-6 pt-6 md:pt-8 relative z-10">
                     <Outlet />
                 </main>
             </div>

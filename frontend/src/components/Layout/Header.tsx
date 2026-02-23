@@ -48,14 +48,14 @@ export default function Header({ title = 'Dashboard', onToggleSidebar }: HeaderP
                         {user?.full_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || '?'}
                     </div>
                     <div className="hidden md:block">
-                        <p className="text-sm font-medium text-surface-100">
+                        <p className="text-sm font-semibold text-surface-100">
                             {user?.full_name || 'User'}
                         </p>
-                        <p className="text-xs text-surface-200/40">{user?.email || ''}</p>
+                        <p className="text-xs text-surface-200/50">{user?.email || ''}</p>
                     </div>
                     <button
                         onClick={logout}
-                        className="p-2 rounded-lg hover:bg-danger-500/10 text-surface-200/40 hover:text-danger-400 transition-colors"
+                        className="px-3 py-1.5 rounded-lg hover:bg-danger-500/10 text-surface-200/50 hover:text-danger-400 transition-colors font-medium text-xs"
                         title="Logout"
                     >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

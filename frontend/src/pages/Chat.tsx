@@ -58,6 +58,7 @@ export default function Chat() {
     const [allWorkspaces, setAllWorkspaces] = useState<WorkspaceOption[]>([]);
     const [selectedSubject, setSelectedSubject] = useState(initialSubjectId);
     const [selectedWorkspace, setSelectedWorkspace] = useState('');
+    const [scopeLoading, setScopeLoading] = useState(true);
 
     // Mode
     const [chatMode, setChatMode] = useState<ChatMode>('chat');
@@ -114,6 +115,8 @@ export default function Chat() {
                 }
             } catch (err) {
                 console.error('Failed to load subjects', err);
+            } finally {
+                setScopeLoading(false);
             }
         };
         loadAll();
@@ -391,13 +394,20 @@ export default function Chat() {
                             className="input !py-1.5 !px-2 text-xs min-w-[220px] max-w-[400px]"
                             value={selectedSubject}
                             onChange={(e) => setSelectedSubject(e.target.value)}
+                            disabled={scopeLoading}
                         >
-                            <option value="">Select a subject...</option>
-                            {allSubjects.map((s) => (
-                                <option key={s.id} value={s.id}>
-                                    {s.label}
-                                </option>
-                            ))}
+                            {scopeLoading ? (
+                                <option value="">Loading…</option>
+                            ) : (
+                                <>
+                                    <option value="">Select a subject...</option>
+                                    {allSubjects.map((s) => (
+                                        <option key={s.id} value={s.id}>
+                                            {s.label}
+                                        </option>
+                                    ))}
+                                </>
+                            )}
                         </select>
                     )}
 
@@ -406,13 +416,20 @@ export default function Chat() {
                             className="input !py-1.5 !px-2 text-xs min-w-[180px] max-w-[300px]"
                             value={selectedWorkspace}
                             onChange={(e) => setSelectedWorkspace(e.target.value)}
+                            disabled={scopeLoading}
                         >
-                            <option value="">Select a workspace...</option>
-                            {allWorkspaces.map((ws) => (
-                                <option key={ws.id} value={ws.id}>
-                                    {ws.name}
-                                </option>
-                            ))}
+                            {scopeLoading ? (
+                                <option value="">Loading…</option>
+                            ) : (
+                                <>
+                                    <option value="">Select a workspace...</option>
+                                    {allWorkspaces.map((ws) => (
+                                        <option key={ws.id} value={ws.id}>
+                                            {ws.name}
+                                        </option>
+                                    ))}
+                                </>
+                            )}
                         </select>
                     )}
 
@@ -452,8 +469,8 @@ export default function Chat() {
                         <div
                             className={`max-w-[70%] rounded-2xl p-4 break-words ${
                                 msg.role === 'user'
-                                    ? 'bg-primary-600/30 border border-primary-500/25 text-surface-100 rounded-tr-none chat-bubble-user'
-                                    : 'bg-surface-800/90 border border-surface-700/80 text-surface-200 rounded-tl-none chat-bubble-assistant'
+                                    ? 'border border-primary-500/30 text-surface-100 rounded-tr-none chat-bubble-user'
+                                    : 'border border-surface-700/60 text-surface-200 rounded-tl-none chat-bubble-assistant'
                             }`}
                         >
                             <div className="whitespace-pre-wrap text-sm leading-7 break-words overflow-wrap-anywhere">
