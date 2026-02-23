@@ -81,12 +81,18 @@ export async function deleteFlashcard(flashcardId: string): Promise<void> {
 }
 
 /**
- * Delete all flashcards for a subject.
+ * Delete all flashcards at a given scope level.
+ * Supports subject_id, course_id, or workspace_id.
  */
-export async function deleteAllFlashcards(subjectId: string): Promise<void> {
-  await apiClient.delete('/flashcards/', {
-    params: { subject_id: subjectId },
-  });
+export async function deleteAllFlashcards(
+  scopeId: string,
+  scopeType: 'subject' | 'course' | 'workspace' = 'subject',
+): Promise<void> {
+  const params: Record<string, string> = {};
+  if (scopeType === 'subject') params.subject_id = scopeId;
+  else if (scopeType === 'course') params.course_id = scopeId;
+  else if (scopeType === 'workspace') params.workspace_id = scopeId;
+  await apiClient.delete('/flashcards/', { params });
 }
 
 /**

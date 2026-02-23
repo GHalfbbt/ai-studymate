@@ -212,11 +212,25 @@ def delete_flashcard(
     Args:
         flashcard_id: Flashcard to delete
     """
+    from app.models.subject import Subject
+    from app.models.course import Course
+    from app.models.workspace import Workspace
+
     flashcard = db.query(Flashcard).filter(Flashcard.id == flashcard_id).first()
     if not flashcard:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Flashcard not found",
+        )
+
+    # Verify ownership
+    user_workspace_ids = [w.id for w in db.query(Workspace).filter(Workspace.user_id == current_user.id).all()]
+    user_course_ids = [c.id for c in db.query(Course).filter(Course.workspace_id.in_(user_workspace_ids)).all()]
+    user_subject_ids = [s.id for s in db.query(Subject).filter(Subject.course_id.in_(user_course_ids)).all()]
+    if flashcard.subject_id not in user_subject_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to delete this flashcard",
         )
 
     db.delete(flashcard)
@@ -225,18 +239,66 @@ def delete_flashcard(
 
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 def delete_all_flashcards(
-    subject_id: UUID,
+    subject_id: Optional[UUID] = None,
+    course_id: Optional[UUID] = None,
+    workspace_id: Optional[UUID] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
-    Delete all flashcards for a subject.
+    Delete all flashcards at a given scope level.
+
+    Supports deleting by subject_id, course_id, or workspace_id.
+    At least one must be provided.
 
     Args:
-        subject_id: Subject to clear flashcards for
+        subject_id: Delete flashcards for this subject
+        course_id: Delete flashcards for all subjects in this course
+        workspace_id: Delete flashcards for all subjects in this workspace
     """
-    db.query(Flashcard).filter(Flashcard.subject_id == subject_id).delete()
-    db.commit()
+    from app.models.subject import Subject
+    from app.models.course import Course
+    from app.models.workspace import Workspace
+
+    if not any([subject_id, course_id, workspace_id]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one of subject_id, course_id, or workspace_id must be provided",
+        )
+
+    # Verify ownership and resolve target subject_ids
+    user_workspace_ids = [w.id for w in db.query(Workspace).filter(Workspace.user_id == current_user.id).all()]
+    user_course_ids = [c.id for c in db.query(Course).filter(Course.workspace_id.in_(user_workspace_ids)).all()]
+    user_subject_ids = [s.id for s in db.query(Subject).filter(Subject.course_id.in_(user_course_ids)).all()]
+
+    target_subject_ids = []
+
+    if subject_id:
+        if subject_id not in user_subject_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to delete flashcards for this subject",
+            )
+        target_subject_ids = [subject_id]
+    elif course_id:
+        if course_id not in user_course_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to delete flashcards for this course",
+            )
+        target_subject_ids = [s.id for s in db.query(Subject).filter(Subject.course_id == course_id).all()]
+    elif workspace_id:
+        if workspace_id not in user_workspace_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to delete flashcards for this workspace",
+            )
+        ws_course_ids = [c.id for c in db.query(Course).filter(Course.workspace_id == workspace_id).all()]
+        target_subject_ids = [s.id for s in db.query(Subject).filter(Subject.course_id.in_(ws_course_ids)).all()]
+
+    if target_subject_ids:
+        db.query(Flashcard).filter(Flashcard.subject_id.in_(target_subject_ids)).delete(synchronize_session=False)
+        db.commit()
 
 
 @router.get("/export/json")
