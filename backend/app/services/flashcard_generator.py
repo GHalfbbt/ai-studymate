@@ -27,10 +27,11 @@ class FlashcardGeneratorService:
     3. Parse response and create Flashcard records
     """
 
-    FLASHCARD_SYSTEM_PROMPT = """You are an expert flashcard creator for study materials.
-Create flashcards that help students memorize and understand key concepts.
+    FLASHCARD_SYSTEM_PROMPT = """You are an expert flashcard creator. You ONLY output valid JSON. No markdown, no explanations, no text before or after the JSON.
 
-You MUST respond with valid JSON in this exact format:
+CRITICAL: Your entire response must be a single JSON object. Do NOT write any text outside the JSON. Do NOT use markdown formatting. Do NOT say "Here are the flashcards" or anything similar.
+
+Output this exact JSON structure:
 {
   "flashcards": [
     {
@@ -42,6 +43,7 @@ You MUST respond with valid JSON in this exact format:
 }
 
 Rules:
+- Your ENTIRE response must be ONLY the JSON object above, nothing else
 - Generate EXACTLY the number of flashcards requested
 - Front side: Clear question, definition prompt, or concept to explain
 - Back side: Complete answer with enough detail to learn from
@@ -49,7 +51,8 @@ Rules:
 - difficulty must be one of: "easy", "medium", "hard"
 - All content must come from the provided context
 - Do NOT invent information not in the context
-- Make flashcards progressively test deeper understanding"""
+- Make flashcards progressively test deeper understanding
+- REMEMBER: Output ONLY valid JSON, no other text"""
 
     def __init__(self, db: Session, llm: LLMClient):
         """
@@ -141,6 +144,7 @@ Rules:
             f"- Mix easy, medium, and hard difficulty levels\n"
             f"- Cover the most important concepts\n"
             f"- Make each flashcard self-contained (understandable without context)\n"
+            f"\nREMEMBER: Respond with ONLY a valid JSON object. No markdown, no explanations, no text before or after the JSON.\n"
         )
 
         # Step 4: Generate with LLM (with retry for transient failures)
@@ -221,9 +225,80 @@ Rules:
             except json.JSONDecodeError:
                 pass
 
+        # Strategy 4: Fallback — parse plain-text Q&A pairs into flashcard JSON
+        parsed = self._parse_plain_text_flashcards(raw_response)
+        if parsed and parsed.get("flashcards"):
+            print(f"⚠️ Used plain-text fallback parser for flashcard generation ({len(parsed['flashcards'])} cards)")
+            return parsed
+
         raise ValueError(
             f"Failed to parse flashcard JSON from LLM: {raw_response[:300]}..."
         )
+
+    def _parse_plain_text_flashcards(self, text: str) -> Optional[Dict[str, Any]]:
+        """
+        Fallback parser: extract flashcards from plain text / markdown
+        when the LLM ignores JSON format instructions (common with Ollama
+        and some smaller models).
+
+        Handles formats like:
+        - "1. Q: question / A: answer"
+        - "Front: ... / Back: ..."
+        - "**Question:** ... **Answer:** ..."
+        - Numbered Q&A pairs separated by newlines
+
+        Args:
+            text: Raw plain-text LLM response
+
+        Returns:
+            Dict with flashcards list, or None if parsing fails
+        """
+        flashcards = []
+
+        # Pattern 1: "Front:" / "Back:" or "Q:" / "A:" pairs
+        pairs = re.findall(
+            r'(?:Front|Question|Q)\s*[:\-]\s*(.+?)\s*(?:Back|Answer|A)\s*[:\-]\s*(.+?)(?=\n\s*(?:Front|Question|Q|\d+[.):])|$)',
+            text,
+            re.IGNORECASE | re.DOTALL,
+        )
+        if pairs:
+            for front, back in pairs:
+                front = front.strip().strip('*').strip()
+                back = back.strip().strip('*').strip()
+                if front and back and len(front) > 5:
+                    flashcards.append({
+                        "front": front[:500],
+                        "back": back[:500],
+                        "difficulty": "medium",
+                    })
+
+        # Pattern 2: Numbered items with question/answer on separate lines
+        if not flashcards:
+            blocks = re.split(r'\n\s*\n|\n\s*\d+[.):\s]', text)
+            for block in blocks:
+                block = block.strip()
+                if not block or len(block) < 15:
+                    continue
+                # Try to split block into Q and A by common separators
+                qa_match = re.match(
+                    r'(.+?)\s*(?:\n\s*[-–—]\s*|\n\s*Answer\s*:\s*|\n\s*A\s*:\s*|\n\s*)(.+)',
+                    block,
+                    re.DOTALL,
+                )
+                if qa_match:
+                    front = re.sub(r'^[\s\d*.):#]+', '', qa_match.group(1)).strip()
+                    back = qa_match.group(2).strip()
+                    if front and back and len(front) > 5 and len(back) > 3:
+                        flashcards.append({
+                            "front": front[:500],
+                            "back": back[:500],
+                            "difficulty": "medium",
+                        })
+
+        if not flashcards:
+            return None
+
+        return {"flashcards": flashcards}
 
     def export_csv(self, subject_id: UUID) -> str:
         """
