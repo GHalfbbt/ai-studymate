@@ -524,7 +524,7 @@ export default function Flashcards() {
 
   // ── LIST MODE ──
   return (
-    <div style={{ padding: '2rem', maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ padding: '2rem', maxWidth: 1000, margin: '0 auto' }}>
       {/* Title */}
       <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem' }}>🃏 Flashcards</h1>
 

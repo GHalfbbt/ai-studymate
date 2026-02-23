@@ -54,7 +54,7 @@ export default function Sidebar({
                         <h1 className="font-bold gradient-text" style={{ fontSize: '1.125rem' }}>
                             StudyMate
                         </h1>
-                        <p style={{ fontSize: '0.75rem', color: 'rgba(226,232,240,0.4)' }}>
+                        <p style={{ fontSize: '0.75rem', color: 'rgba(226,232,240,0.55)', fontWeight: 500 }}>
                             AI-Powered Learning
                         </p>
                     </div>

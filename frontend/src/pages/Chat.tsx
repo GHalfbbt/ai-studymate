@@ -58,6 +58,7 @@ export default function Chat() {
     const [allWorkspaces, setAllWorkspaces] = useState<WorkspaceOption[]>([]);
     const [selectedSubject, setSelectedSubject] = useState(initialSubjectId);
     const [selectedWorkspace, setSelectedWorkspace] = useState('');
+    const [scopeLoading, setScopeLoading] = useState(true);
 
     // Mode
     const [chatMode, setChatMode] = useState<ChatMode>('chat');
@@ -114,6 +115,8 @@ export default function Chat() {
                 }
             } catch (err) {
                 console.error('Failed to load subjects', err);
+            } finally {
+                setScopeLoading(false);
             }
         };
         loadAll();
@@ -325,7 +328,7 @@ export default function Chat() {
     // ─── Render ─────────────────────────────────────────
 
     return (
-        <div className="flex flex-col h-[calc(100vh-8rem)] max-w-5xl mx-auto animate-fade-in">
+        <div className="flex flex-col h-[calc(100vh-8rem)] max-w-5xl mx-auto animate-fade-in overflow-hidden">
             {/* Header */}
             <div className="flex flex-col gap-4 mb-6">
                 {/* Title row */}
@@ -340,23 +343,23 @@ export default function Chat() {
                     </div>
 
                     {/* Mode toggle */}
-                    <div className="flex items-center gap-1 p-1 rounded-xl bg-surface-900/60 border border-surface-700/50">
+                    <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-surface-900/60 border border-surface-700/50">
                         <button
                             onClick={() => handleModeToggle('chat')}
-                            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                            className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all ${
                                 chatMode === 'chat'
-                                    ? 'bg-primary-600 text-white shadow-md'
-                                    : 'text-surface-200/70 hover:text-surface-100'
+                                    ? 'bg-primary-600 text-white shadow-lg ring-2 ring-primary-500/30'
+                                    : 'text-surface-200/70 hover:text-surface-100 hover:bg-surface-800/50'
                             }`}
                         >
                             💬 Chat
                         </button>
                         <button
                             onClick={() => handleModeToggle('quiz')}
-                            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                            className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all ${
                                 chatMode === 'quiz'
-                                    ? 'bg-accent-600 text-white shadow-md'
-                                    : 'text-surface-200/70 hover:text-surface-100'
+                                    ? 'bg-accent-600 text-white shadow-lg ring-2 ring-accent-500/30'
+                                    : 'text-surface-200/70 hover:text-surface-100 hover:bg-surface-800/50'
                             }`}
                         >
                             🧠 Quiz
@@ -391,13 +394,20 @@ export default function Chat() {
                             className="input !py-1.5 !px-2 text-xs min-w-[220px] max-w-[400px]"
                             value={selectedSubject}
                             onChange={(e) => setSelectedSubject(e.target.value)}
+                            disabled={scopeLoading}
                         >
-                            <option value="">Select a subject...</option>
-                            {allSubjects.map((s) => (
-                                <option key={s.id} value={s.id}>
-                                    {s.label}
-                                </option>
-                            ))}
+                            {scopeLoading ? (
+                                <option value="">Loading…</option>
+                            ) : (
+                                <>
+                                    <option value="">Select a subject...</option>
+                                    {allSubjects.map((s) => (
+                                        <option key={s.id} value={s.id}>
+                                            {s.label}
+                                        </option>
+                                    ))}
+                                </>
+                            )}
                         </select>
                     )}
 
@@ -406,13 +416,20 @@ export default function Chat() {
                             className="input !py-1.5 !px-2 text-xs min-w-[180px] max-w-[300px]"
                             value={selectedWorkspace}
                             onChange={(e) => setSelectedWorkspace(e.target.value)}
+                            disabled={scopeLoading}
                         >
-                            <option value="">Select a workspace...</option>
-                            {allWorkspaces.map((ws) => (
-                                <option key={ws.id} value={ws.id}>
-                                    {ws.name}
-                                </option>
-                            ))}
+                            {scopeLoading ? (
+                                <option value="">Loading…</option>
+                            ) : (
+                                <>
+                                    <option value="">Select a workspace...</option>
+                                    {allWorkspaces.map((ws) => (
+                                        <option key={ws.id} value={ws.id}>
+                                            {ws.name}
+                                        </option>
+                                    ))}
+                                </>
+                            )}
                         </select>
                     )}
 
@@ -425,7 +442,7 @@ export default function Chat() {
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto pr-2 space-y-7 custom-scrollbar pb-4">
+            <div className="flex-1 overflow-y-auto px-4 pr-2 space-y-5 custom-scrollbar pb-4">
                 {messages.length === 0 && (
                     <div className="h-full flex flex-col items-center justify-center text-center p-8">
                         <span className="text-6xl mb-6 opacity-20">
@@ -438,18 +455,9 @@ export default function Chat() {
                         </h2>
                         <p className="text-surface-200/60 mt-2 max-w-md text-sm">
                             {chatMode === 'quiz'
-                                ? 'Click "New Question" below to get a quiz question from your study materials.'
+                                ? 'Click "Generate First Question" below to get started.'
                                 : 'I can answer questions based on the documents you\'ve uploaded. Select a scope above to narrow down the context.'}
                         </p>
-                        {chatMode === 'quiz' && (
-                            <button
-                                onClick={requestQuizQuestion}
-                                disabled={isLoading}
-                                className="mt-6 btn-primary !px-8 !py-3"
-                            >
-                                🎯 Generate First Question
-                            </button>
-                        )}
                     </div>
                 )}
 
@@ -459,13 +467,13 @@ export default function Chat() {
                         className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-slide-up`}
                     >
                         <div
-                            className={`max-w-[85%] rounded-2xl p-4 ${
+                            className={`max-w-[70%] rounded-2xl p-4 break-words ${
                                 msg.role === 'user'
-                                    ? 'bg-primary-600/30 border border-primary-500/25 text-surface-100 rounded-tr-none'
-                                    : 'bg-surface-800/90 border border-surface-700/80 text-surface-200 rounded-tl-none'
+                                    ? 'border border-primary-500/30 text-surface-100 rounded-tr-none chat-bubble-user'
+                                    : 'border border-surface-700/60 text-surface-200 rounded-tl-none chat-bubble-assistant'
                             }`}
                         >
-                            <div className="whitespace-pre-wrap text-sm leading-7">
+                            <div className="whitespace-pre-wrap text-sm leading-7 break-words overflow-wrap-anywhere">
                                 {msg.content}
                             </div>
 
@@ -527,8 +535,8 @@ export default function Chat() {
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Quiz: Next Question button */}
-            {chatMode === 'quiz' && quizState.feedbackShown && !isLoading && (
+            {/* Quiz: Generate Question button — visible when in quiz mode with no active question */}
+            {chatMode === 'quiz' && !quizState.awaitingAnswer && !quizState.currentQuestion && !isLoading && (
                 <div className="flex justify-center py-2">
                     <button
                         onClick={() => {
@@ -541,13 +549,13 @@ export default function Chat() {
                         }}
                         className="btn-primary !px-6"
                     >
-                        🎯 Next Question
+                        🎯 {messages.length === 0 ? 'Generate First Question' : 'Next Question'}
                     </button>
                 </div>
             )}
 
             {/* Input Area */}
-            <form onSubmit={handleSendMessage} className="mt-3 relative">
+            <form onSubmit={handleSendMessage} className="mt-3 mb-1 relative">
                 <input
                     type="text"
                     className="input w-full !pr-24 !py-4 shadow-xl"
@@ -565,13 +573,9 @@ export default function Chat() {
                 <button
                     type="submit"
                     disabled={isLoading || !inputValue.trim()}
-                    className="absolute right-2 top-2 bottom-2 btn-primary !px-6"
+                    className="absolute right-2 top-2 bottom-2 btn-primary !px-6 whitespace-nowrap"
                 >
-                    {isLoading
-                        ? '...'
-                        : chatMode === 'quiz' && quizState.awaitingAnswer
-                        ? 'Submit'
-                        : 'Send'}
+                    Send
                 </button>
             </form>
         </div>
