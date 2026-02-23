@@ -1,7 +1,10 @@
 /**
  * RAG (Retrieval-Augmented Generation) API service.
  * 
- * Handles queries to the AI study assistant.
+ * Handles queries to the AI study assistant, including:
+ * - Normal chat queries
+ * - Quiz question generation
+ * - Quiz answer evaluation
  */
 
 import apiClient from './client';
@@ -10,7 +13,7 @@ import type { RAGQuery, RAGResponse } from '../types';
 /**
  * Send a question to the AI study assistant.
  * 
- * @param query - Query configuration (question, subject filter, etc.)
+ * @param query - Query configuration (question, subject filter, scope, mode, etc.)
  * @returns AI response with grounding sources
  */
 export async function queryRAG(query: RAGQuery): Promise<RAGResponse> {
