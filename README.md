@@ -275,7 +275,7 @@ Feel free to:
 
 ### Ideas for Future Development
 
-- 🎙️ Voice practice mode (speech-to-text + evaluation)
+- 🎙️ Voice practice mode (speech-to-text + evaluation) — *partially scaffolded, coming soon*
 - 📱 Mobile-responsive PWA
 - 🌐 Multi-language support
 - 📊 Advanced analytics with ML-based predictions

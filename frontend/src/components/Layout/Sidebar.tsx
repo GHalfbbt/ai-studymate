@@ -13,7 +13,7 @@ const navItems = [
     { path: '/chat', label: 'Study Chat', icon: '💬' },
     { path: '/exams', label: 'Exams', icon: '📝' },
     { path: '/flashcards', label: 'Flashcards', icon: '🃏' },
-    { path: '/voice', label: 'Voice', icon: '🎤' },
+    // { path: '/voice', label: 'Voice', icon: '🎤' },  // Coming soon
     { path: '/analytics', label: 'Analytics', icon: '📊' },
 ];
 
