@@ -100,23 +100,29 @@ export interface DocumentListResponse {
 export interface RAGQuery {
     question: string;
     subject_id?: string;
+    workspace_id?: string;
+    scope?: 'subject' | 'workspace' | 'all';
     document_ids?: string[];
     top_k?: number;
+    mode?: 'chat' | 'quiz' | 'quiz_evaluate';
+    quiz_question?: string;
+    user_answer?: string;
 }
 
 export interface RAGSource {
-    source_number: number;
     document_id: string | null;
-    filename: string | null;
-    chunk_index: number | null;
+    document_name: string;
+    chunk_index: number;
     relevance_score: number;
-    excerpt: string;
+    content: string;
+    page?: number | null;
 }
 
 export interface RAGResponse {
     answer: string;
     sources: RAGSource[];
-    confidence: number;
+    question: string;
+    mode: string;
 }
 
 // ============================================================
